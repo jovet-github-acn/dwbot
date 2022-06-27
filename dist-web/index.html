@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<script src='waxjs.js'></script>
+
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <!-- jQuery -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="main.css">
+
+    <title>Diggers World Bot</title>
+  </head>
+
+<body>
+  <div class="text-center">
+    <h3 class="bot-name text-center mt-3">Diggers World Bot</h3>
+  </div>
+  <div class="container mt-5 text-center" id="login-container">
+    <div class="dropdown mb-2">
+      <button class="btn btn-secondary dropdown-toggle" type="button" id="rpc-menu-button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+        https://wax.greymass.com
+      </button>
+      <div class="dropdown-menu" aria-labelledby="rpc-menu-button" id="rpc-menu-dropdown">
+      </div>
+    </div>
+    <button id="btn-login" type="button" class="btn btn-primary btn-lg btn-block">Login</button>
+  </div>
+  
+  <div class="container mt-5" id="bot-container">
+    <button type="button" class="btn btn-info btn-lg btn-block" id="btn-start-stop-bot">Start Bot</button>
+    <button type="button" class="btn btn-secondary btn-lg btn-block" id="btn-logout">Logout</button>
+
+    <div class="container mt-3">
+      
+      <p class="text-center mt-4" id="process-indicator"></p>
+
+      <div class="container mt-3">
+        <div id="rowtoken" class="row"></div>
+      </div>
+      <div class="row d-flex justify-content-center text-dark">
+        <ul class="list-group col-md-10" id="rowtools"></ul>
+      </div>
+      <div class="log-container mt-3">
+        <ul class="list-group" id="logs"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script src="mainwax.js"></script>
+
+  <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+  </body>
+  </html>
