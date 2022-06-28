@@ -175,7 +175,7 @@ async function getUserBalance() {
 
 var userBags = []
 async function getUserBags() {
-    var log = "Get user bags for trolley"
+    var log = "Get available small coal bags for trolley from this account - " + userAccount
     processIndicatorElem.text(log)
     addLogInfo(log)
 
@@ -204,7 +204,7 @@ async function getTrolley() {
         var trolleyName = "trolley-" + trolley[i].asset_id
 
         var journey = await getJourneyLong(trolley[i])
-        if (journey == trolley[i].push_counter) {
+        if (!isTrolleyStillRunning(trolley) && journey == trolley[i].push_counter) {
             await startNewJourney([trolley[i]])
         } else {
             addLog("Still on current Journey - No need to start new one.", trolleyName, 1, 'list-group-item-info')
@@ -214,11 +214,15 @@ async function getTrolley() {
     }
 }
 
+async function isTrolleyStillRunning(trolley) {
+    return new Date(trolley.next_action_time * 1000) > new Date()
+}
+
 async function onAttemptPushTrolley(trolley, trolleyName) {
     processIndicatorElem.text("Check status " + trolleyName)
     await new Promise(resolve => setTimeout(resolve, 2000))
 
-    if (new Date(trolley.next_action_time * 1000) > new Date()) {
+    if (isTrolleyStillRunning(trolley)) {
         addLog("Still mining", trolleyName, 1, 'list-group-item-warning')
         reloadSched(new Date(trolley.next_action_time * 1000).getTime() - new Date().getTime())
     } else {
