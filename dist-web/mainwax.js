@@ -227,7 +227,7 @@ async function onAttemptPushTrolley(trolley, trolleyName) {
         reloadSched(new Date(trolley.next_action_time * 1000).getTime() - new Date().getTime())
     } else {
         if (userBags.length == 0) {
-            await buySmallBagofCoal()
+            await buySmallBagofCoal([trolley])
         }
         await onPushTrolley([trolley])
     }
@@ -276,9 +276,40 @@ async function startNewJourney(trolleys) {
     }
 }
 
-async function buySmallBagofCoal() {
+async function buySmallBagofCoal(trolleys) {
     var log = "Atempt buy small bag of coal "
     processIndicatorElem.text(log)
+
+    addLogInfo(log)
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const actions = $.map(trolleys, (trolley) => {
+        return {
+            account: dappAccount,
+            name: 'buy',
+            authorization: [{
+                actor: userAccount,
+                permission: 'active',
+            }],
+            data: {
+                player: userAccount,
+                template_id: 530552,
+            },
+        }
+    })
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Buy", "Small bag of coal", actions.length, 'list-group-item-success')
+        await getUserBags()
+    } catch (e) {
+        addLog("Error Buy ? " + "Small bag of coal", e, actions.length, 'list-group-item-danger')
+    }
 }
 
 async function onPushTrolley(trolleys) {
