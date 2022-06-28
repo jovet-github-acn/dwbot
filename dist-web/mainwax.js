@@ -310,6 +310,7 @@ async function onPushTrolley(trolleys) {
                 expireSeconds: 30,
             });
             addLog("Success Push Trolley", name, actions.length, 'list-group-item-success')
+            await updateTrolley()
         } catch (e) {
             addLog("Error Push Trolley ? " + name, e, actions.length, 'list-group-item-danger')
         }
@@ -317,6 +318,17 @@ async function onPushTrolley(trolleys) {
         addLog("Warning", "Cannot push trolley without small bag coal available in your account", 0, 'list-group-item-warning')
     }
     
+}
+
+async function updateTrolley() {
+    trolley = (await getFromTableWithKey('trolley', 100, 'name', 1)).rows
+    console.log(trolley)
+
+    rowTrolley.empty()
+    for (var i=0; i<trolley.length; i++) {
+        var trolleyName = "trolley-" + trolley[i].asset_id
+        await addTrolley(trolley[i], trolleyName)
+    }
 }
 
 var userTools
