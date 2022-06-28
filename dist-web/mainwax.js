@@ -204,7 +204,7 @@ async function getTrolley() {
         var trolleyName = "trolley-" + trolley[i].asset_id
 
         var journey = await getJourneyLong(trolley[i])
-        if (!isTrolleyStillRunning(trolley) && journey == trolley[i].push_counter) {
+        if (new Date(trolley.next_action_time * 1000) < new Date() && journey == trolley[i].push_counter) {
             await startNewJourney([trolley[i]])
         } else {
             addLog("Still on current Journey - No need to start new one.", trolleyName, 1, 'list-group-item-info')
@@ -214,15 +214,11 @@ async function getTrolley() {
     }
 }
 
-async function isTrolleyStillRunning(trolley) {
-    return new Date(trolley.next_action_time * 1000) > new Date()
-}
-
 async function onAttemptPushTrolley(trolley, trolleyName) {
     processIndicatorElem.text("Check status " + trolleyName)
     await new Promise(resolve => setTimeout(resolve, 2000))
 
-    if (isTrolleyStillRunning(trolley)) {
+    if (new Date(trolley.next_action_time * 1000) > new Date()) {
         addLog("Still mining", trolleyName, 1, 'list-group-item-warning')
         reloadSched(new Date(trolley.next_action_time * 1000).getTime() - new Date().getTime())
     } else {
