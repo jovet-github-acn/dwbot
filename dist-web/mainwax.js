@@ -337,9 +337,9 @@ async function countDownTimer(id, countDownDate) {
 
 async function addTools(tool, tconf) {
     rowTools.append('<li class="list-group-item d-flex justify-content-between align-items-center">' +
-        '<span class=" text-left col-4 tool-name">' + tconf.template_name + "-" + tconf.type + ':'+tconf.rarity + '</span>' +
-        '<span class="text-right col-3">' + tool.durability+'/'+tconf.init_durability + '</span>' +
-        '<span class="text-right col-3">' + 0 + ' wax</span>' +
+        '<span class=" text-left col-6 tool-name">' + tconf.template_name + "-" + tconf.rarity + '</span>' +
+        '<span class="text-right col-1">' + tool.durability+'/'+tconf.init_durability + '</span>' +
+        //'<span class="text-right col-1">' + 0 + ' wax</span>' +
         '<span class="badge badge-primary badge-pill col-2" style="width: 80px;" id="' + tool.asset_id + '">' + countDownTimerTools(tool) + '</span>' +
     '</li>')
 }
