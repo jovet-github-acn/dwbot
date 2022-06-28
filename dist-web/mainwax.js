@@ -28,6 +28,7 @@ var enableCatchError = false
 var start = false
 
 const rowToken = $("#rowtoken")
+const rowTrolley = $("#rowtrolley")
 const rowTools = $("#rowtools")
 
 const processIndicatorElem = $("#process-indicator")
@@ -148,6 +149,8 @@ async function startBot() {
     } else {
         await getToolsConfig()
         await getUserBalance()
+        await getUserBags()
+        await getTrolley()
         await getUserTools()
     }
 }
@@ -168,6 +171,152 @@ async function getUserBalance() {
     for (var i=0; i<balanceToken.length; i++) {
         rowToken.append('<div class="col-sm">'+balanceToken[i]+'</div>')
     }
+}
+
+var userBags = []
+async function getUserBags() {
+    var log = "Get user bags for trolley"
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    userAssets = (await getFromTableDynamic('atomicassets', userAccount, 'assets', 1000, "")).rows
+
+    for (var i=0; i<userAssets.length; i++) {
+        var asset = userAssets[i]
+        if (asset.collection_name = 'diggersworld' && asset.template_id == 530552 && asset.schema_name == 'bags') {
+            userBags.push(asset)
+        }
+    }
+    if (userBags.length == 0) {
+        addLog("Warning", "No small bag coal available in your account", 0, 'list-group-item-warning')
+    }
+    console.log(userBags)
+}
+
+
+var trolley
+async function getTrolley() {
+    trolley = (await getFromTableWithKey('trolley', 100, 'name', 1)).rows
+    console.log(trolley)
+
+    rowTrolley.empty()
+    for (var i=0; i<trolley.length; i++) {
+        var trolleyName = "trolley-" + trolley[i].asset_id
+
+        var journey = await getJourneyLong(trolley[i])
+        if (journey == trolley[i].push_counter) {
+            await startNewJourney([trolley[i]])
+        } else {
+            addLog("Still on current Journey - No need to start new one.", trolleyName, 1, 'list-group-item-info')
+        }
+        await addTrolley(trolley[i], trolleyName)
+        await onAttemptPushTrolley(trolley[i], trolleyName)
+    }
+}
+
+async function onAttemptPushTrolley(trolley, trolleyName) {
+    processIndicatorElem.text("Check status " + trolleyName)
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    if (new Date(trolley.next_action_time * 1000) > new Date()) {
+        addLog("Still mining", trolleyName, 1, 'list-group-item-warning')
+        reloadSched(new Date(trolley.next_action_time * 1000).getTime() - new Date().getTime())
+    } else {
+        if (userBags.length == 0) {
+            await buySmallBagofCoal()
+        }
+        await onPushTrolley([trolley])
+    }
+}
+
+async function startNewJourney(trolleys) {
+    var name = "trolley-" + trolley[0].asset_id
+    var log = "Atempt start new journey " + name
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const actions = $.map(trolleys, (trolley) => {
+        return {
+            account: dappAccount,
+            name: 'startjourney',
+            authorization: [{
+                actor: userAccount,
+                permission: 'active',
+            }],
+            data: {
+                account: dappAccount,
+                name: 'startjourney',
+                authorization: [{
+                    actor: userAccount,
+                    permission: 'active',
+                }],
+                data: {
+                    asset_owner: userAccount,
+                    short_j: true,
+                },
+            },
+        }
+    })
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Start New Journey", name, actions.length, 'list-group-item-success')
+    } catch (e) {
+        addLog("Error Start New Journey ? " + name, e, actions.length, 'list-group-item-danger')
+    }
+}
+
+async function buySmallBagofCoal() {
+    var log = "Atempt buy small bag of coal "
+    processIndicatorElem.text(log)
+}
+
+async function onPushTrolley(trolleys) {
+    if (userBags.length != 0) {
+        var name = "trolley-" + trolleys[0].asset_id
+        var log = "Atempt push " + name
+        processIndicatorElem.text(log)
+        addLogInfo(log)
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const actions = $.map(trolleys, (trolley) => {
+            return {
+                account: 'atomicassets',
+                name: 'transfer',
+                authorization: [{
+                    actor: userAccount,
+                    permission: 'active',
+                }],
+                data: {
+                    from: userAccount,
+                    to: dappAccount,
+                    memo: 'push',
+                    asset_ids: [userBags[0].asset_id],
+                },
+            }
+        })
+        try {
+            const result = await wax.api.transact({
+                actions: actions
+            }, {
+                blocksBehind: 3,
+                expireSeconds: 30,
+            });
+            addLog("Success Push Trolley", name, actions.length, 'list-group-item-success')
+        } catch (e) {
+            addLog("Error Push Trolley ? " + name, e, actions.length, 'list-group-item-danger')
+        }
+    } else {
+        addLog("Warning", "Cannot push trolley without small bag coal available in your account", 0, 'list-group-item-warning')
+    }
+    
 }
 
 var userTools
@@ -200,7 +349,7 @@ async function getUserTools() {
         await getUserTools()
     } else {
         processIndicatorElem.text("This page will reload after 1 hour")
-        //only update if there's any claimed tool
+        //update only if there's any claimed tool
         if (totalClaimedTools != 0) {
             await new Promise(resolve => setTimeout(resolve, 5000))
             await getUserBalance()
@@ -241,8 +390,9 @@ async function attemptClaimTool(tool, toolName) {
 
 async function onRepairTool(tools, toolName) {
     if (tools[0].durability == 0) {
-        processIndicatorElem.text("Atempt repair tool " + toolName)
-        addLogInfo("Atempt repair tool " + toolName)
+        var log = "Atempt repair tool " + toolName
+        processIndicatorElem.text(log)
+        addLogInfo(log)
         await new Promise(resolve => setTimeout(resolve, 2000))
 
         const actionsRepair = $.map(tools, (tool) => {
@@ -274,8 +424,9 @@ async function onRepairTool(tools, toolName) {
 }
 
 async function onClaimTool(tools, toolName) {
-    processIndicatorElem.text("Atempt claim tool " + toolName)
-    addLogInfo("Atempt claim tool " + toolName)
+    var log = "Atempt claim tool " + toolName
+    processIndicatorElem.text(log)
+    addLogInfo(log)
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -313,6 +464,11 @@ async function countDownTimerTools(tool) {
     await countDownTimer(tool.asset_id, countDownDate)
 }
 
+async function countDownTimerTrolley(trolley) {
+    var countDownDate = new Date(trolley.next_action_time * 1000);
+    await countDownTimer(trolley.asset_id, countDownDate)
+}
+
 async function countDownTimer(id, countDownDate) {
     await new Promise(resolve => setTimeout(resolve, 100));
     $("#"+id).text("Loading")
@@ -344,6 +500,25 @@ async function addTools(tool, tconf) {
     '</li>')
 }
 
+async function getJourneyLong(trolley) {
+    if (trolley.journey_type == 'short') {
+        return 25
+    } else if (trolley.journey_type == 'long') {
+        return 60
+    } else {
+        return 0
+    }
+}
+
+async function addTrolley(trolley) {
+    rowTrolley.append('<li class="list-group-item d-flex justify-content-between align-items-center">' +
+        '<span class=" text-left col-6 trolley-name">Trolley-' + trolley.asset_id + '</span>' +
+        '<span class="text-right col-1">' + trolley.push_counter + '/' + await getJourneyLong(trolley) + '</span>' +
+        //'<span class="text-right col-1">' + 0 + ' wax</span>' +
+        '<span class="badge badge-primary badge-pill col-2" style="width: 80px;" id="' + trolley.asset_id + '">' + countDownTimerTrolley(trolley) + '</span>' +
+    '</li>')
+}
+
 var totalWax = 0
 async function addTotalNetProfit() {
     rowTools.append('<li class="list-group-item d-flex justify-content-between align-items-center">' +
@@ -355,11 +530,11 @@ async function addTotalNetProfit() {
 }
 
 function addLog(tag, textLog, actionsCount, bsClass) {
-    $("#logs").prepend('<li class="transactional-list list-group-item d-flex justify-content-between align-items-center ' + bsClass + '">' + tag + " : " + textLog + '<span class="badge badge-primary badge-pill">' + actionsCount + '</span></li>')
+    logElem.prepend('<li class="transactional-list list-group-item d-flex justify-content-between align-items-center ' + bsClass + '">' + tag + " : " + textLog + '<span class="badge badge-primary badge-pill">' + actionsCount + '</span></li>')
 }
 
 function addLogInfo(textLog) {
-    $("#logs").prepend('<li class="non-transactional-list list-group-item list-group-item-info">' + textLog + '</li>')
+    logElem.prepend('<li class="non-transactional-list list-group-item list-group-item-info">' + textLog + '</li>')
 }
 
 async function reload(time) {
