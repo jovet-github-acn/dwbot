@@ -3,7 +3,7 @@ let publicKeys =
   localStorage.getItem('PublicKeys') != null ? JSON.parse(localStorage.getItem('PublicKeys')) : null
 
 var rpcCurrentIndex = localStorage.getItem('rpcIndex') != null ? localStorage.getItem('rpcIndex') : 0
-const listRPC = ['https://wax.greymass.com', 'https://wax.pink.gg', 'https://api-idm.wax.io', 'https://api.wax.alohaeos.com', 'https://api.waxsweden.org', 'https://api.wax.greeneosio.com', 'https://chain.wax.io']
+const listRPC = ['https://wax.greymass.com', 'https://api.tokengamer.io', 'https://wax.pink.gg', 'https://api-idm.wax.io', 'https://api.wax.alohaeos.com', 'https://api.waxsweden.org', 'https://api.wax.greeneosio.com', 'https://chain.wax.io']
 
 const waxJS = () => {
     if (userAccount != null && publicKeys != null) {
@@ -203,7 +203,7 @@ async function getTrolley() {
     for (var i=0; i<trolley.length; i++) {
         var trolleyName = "trolley-" + trolley[i].asset_id
 
-        var journey = await getJourneyLong(trolley[i])
+        var journey = await getJourneyDuration(trolley[i])
         if (new Date(trolley.next_action_time * 1000) < new Date() && journey == trolley[i].push_counter) {
             await startNewJourney([trolley[i]])
         } else {
@@ -358,7 +358,13 @@ async function updateTrolley() {
     rowTrolley.empty()
     for (var i=0; i<trolley.length; i++) {
         var trolleyName = "trolley-" + trolley[i].asset_id
+
+        userBags.shift() // this will remove used bag at 1st index - no need to refetch the userBags to reduce the usage of cpu
         await addTrolley(trolley[i], trolleyName)
+
+        if (new Date(trolley.next_action_time * 1000) > new Date()) {
+            reloadSched(new Date(trolley.next_action_time * 1000).getTime() - new Date().getTime())
+        }
     }
 }
 
@@ -438,7 +444,7 @@ async function onRepairTool(tools, toolName) {
         addLogInfo(log)
         await new Promise(resolve => setTimeout(resolve, 2000))
 
-        const actionsRepair = $.map(tools, (tool) => {
+        const actions = $.map(tools, (tool) => {
             return {
                 account: dappAccount,
                 name: 'trepair',
@@ -454,14 +460,14 @@ async function onRepairTool(tools, toolName) {
         })
         try {
             const result = await wax.api.transact({
-                actions: actionsRepair
+                actions: actions
             }, {
                 blocksBehind: 3,
                 expireSeconds: 30,
             });
-            addLog("Success Repair Tool", toolName, actionsRepair.length, 'list-group-item-success')
+            addLog("Success Repair Tool", toolName, actions.length, 'list-group-item-success')
         } catch (e) {
-            addLog("Error Repair Tool ? " + toolName, e, actionsRepair.length, 'list-group-item-danger')
+            addLog("Error Repair Tool ? " + toolName, e, actions.length, 'list-group-item-danger')
         }
     }
 }
@@ -473,7 +479,7 @@ async function onClaimTool(tools, toolName) {
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const actionsRepair = $.map(tools, (tool) => {
+    const actions = $.map(tools, (tool) => {
         return {
             account: dappAccount,
             name: 'safemine',
@@ -489,16 +495,16 @@ async function onClaimTool(tools, toolName) {
     })
     try {
         const result = await wax.api.transact({
-            actions: actionsRepair
+            actions: actions
         }, {
             blocksBehind: 3,
             expireSeconds: 30,
         });
         totalClaimedTools = totalClaimedTools + 1
-        addLog("Success Claim Tool", toolName, actionsRepair.length, 'list-group-item-success')
+        addLog("Success Claim Tool", toolName, actions.length, 'list-group-item-success')
     } catch (e) {
         availableToolToMine = availableToolToMine + 1
-        addLog("Error Claim Tool ? " + toolName, e, actionsRepair.length, 'list-group-item-danger')
+        addLog("Error Claim Tool ? " + toolName, e, actions.length, 'list-group-item-danger')
     }
 }
 
@@ -543,7 +549,7 @@ async function addTools(tool, tconf) {
     '</li>')
 }
 
-async function getJourneyLong(trolley) {
+async function getJourneyDuration(trolley) {
     if (trolley.journey_type == 'short') {
         return 25
     } else if (trolley.journey_type == 'long') {
@@ -556,7 +562,7 @@ async function getJourneyLong(trolley) {
 async function addTrolley(trolley) {
     rowTrolley.append('<li class="list-group-item d-flex justify-content-between align-items-center">' +
         '<span class=" text-left col-6 trolley-name">Trolley-' + trolley.asset_id + '</span>' +
-        '<span class="text-right col-1">' + trolley.push_counter + '/' + await getJourneyLong(trolley) + '</span>' +
+        '<span class="text-right col-4">' + trolley.push_counter + '/' + await getJourneyDuration(trolley) + ' ('+ userBags.length + ' Bags)</span>' +
         //'<span class="text-right col-1">' + 0 + ' wax</span>' +
         '<span class="badge badge-primary badge-pill col-2" style="width: 80px;" id="' + trolley.asset_id + '">' + countDownTimerTrolley(trolley) + '</span>' +
     '</li>')
@@ -608,7 +614,7 @@ async function getFromTableDynamic(code, scope, table, limit, bound) {
         reverse: false,
         show_payer: false
     }
-    console.log("tableReq", tableReq)
+    //console.log("tableReq", tableReq)
     return await wax.rpc.get_table_rows(tableReq);
 }
 
@@ -622,7 +628,7 @@ async function getFromTable(table, limit) {
         reverse: false,
         show_payer: false
     }
-    console.log("tableReq", tableReq)
+    //console.log("tableReq", tableReq)
     return await wax.rpc.get_table_rows(tableReq);
 }
 
