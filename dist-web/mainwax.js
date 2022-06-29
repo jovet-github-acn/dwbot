@@ -344,6 +344,8 @@ async function onPushTrolley(trolleys) {
             await updateTrolley()
         } catch (e) {
             addLog("Error Push Trolley ? " + name, e, actions.length, 'list-group-item-danger')
+            await buySmallBagofCoal(trolleys)
+            await getTrolley()
         }
     } else {
         addLog("Warning", "Cannot push trolley without small bag coal available in your account", 0, 'list-group-item-warning')
