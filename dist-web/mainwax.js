@@ -204,8 +204,12 @@ async function getTrolley() {
         var trolleyName = "trolley-" + trolley[i].asset_id
 
         var journey = await getJourneyDuration(trolley[i])
-        if (new Date(trolley.next_action_time * 1000) < new Date() && journey == trolley[i].push_counter) {
-            await startNewJourney([trolley[i]])
+        if (new Date(trolley[i].next_action_time * 1000) < new Date() && journey == trolley[i].push_counter) {
+            if (trolley[i].journey_type != '') {
+                await claimJourney([trolley[i]])
+            } else {
+                await startNewJourney([trolley[i]])
+            }
         } else {
             addLog("Still on current Journey - No need to start new one.", trolleyName, 1, 'list-group-item-info')
         }
@@ -229,6 +233,40 @@ async function onAttemptPushTrolley(trolley, trolleyName) {
     }
 }
 
+async function claimJourney(trolleys) {
+    var name = "trolley-" + trolley[0].asset_id
+    var log = "Claim journey " + name
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const actions = $.map(trolleys, (trolley) => {
+        return {
+            account: dappAccount,
+            name: 'claimjourney',
+            authorization: [{
+                actor: userAccount,
+                permission: 'active',
+            }],
+            data: {
+                asset_owner: userAccount,
+            },
+        }
+    })
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Claim Journey", name, actions.length, 'list-group-item-success')
+    } catch (e) {
+        addLog("Error Claim Journey ? " + name, e, actions.length, 'list-group-item-danger')
+    }
+}
+
 async function startNewJourney(trolleys) {
     var name = "trolley-" + trolley[0].asset_id
     var log = "Atempt start new journey " + name
@@ -246,16 +284,8 @@ async function startNewJourney(trolleys) {
                 permission: 'active',
             }],
             data: {
-                account: dappAccount,
-                name: 'startjourney',
-                authorization: [{
-                    actor: userAccount,
-                    permission: 'active',
-                }],
-                data: {
-                    asset_owner: userAccount,
-                    short_j: true,
-                },
+                asset_owner: userAccount,
+                short_j: true,
             },
         }
     })
@@ -302,6 +332,7 @@ async function buySmallBagofCoal(trolleys) {
             expireSeconds: 30,
         });
         addLog("Success Buy", "Small bag of coal", actions.length, 'list-group-item-success')
+        await new Promise(resolve => setTimeout(resolve, 10000));
         await getUserBags()
     } catch (e) {
         addLog("Error Buy ? " + "Small bag of coal", e, actions.length, 'list-group-item-danger')
@@ -310,7 +341,7 @@ async function buySmallBagofCoal(trolleys) {
 
 async function onPushTrolley(trolleys) {
     if (userBags.length != 0) {
-        var name = "trolley-" + trolleys[0].asset_id
+        var name = "trolley-" + trolleys[0].asset_id + "; small coal bag-" + userBags[0].asset_id
         var log = "Atempt push " + name
         processIndicatorElem.text(log)
         addLogInfo(log)
@@ -344,11 +375,12 @@ async function onPushTrolley(trolleys) {
             await updateTrolley()
         } catch (e) {
             addLog("Error Push Trolley ? " + name, e, actions.length, 'list-group-item-danger')
-            await buySmallBagofCoal(trolleys)
             await getTrolley()
         }
     } else {
         addLog("Warning", "Cannot push trolley without small bag coal available in your account", 0, 'list-group-item-warning')
+        await buySmallBagofCoal(trolleys)
+        await getTrolley()
     }
     
 }
@@ -553,7 +585,7 @@ async function addTools(tool, tconf) {
 
 async function getJourneyDuration(trolley) {
     if (trolley.journey_type == 'short') {
-        return 25
+        return 24
     } else if (trolley.journey_type == 'long') {
         return 60
     } else {
