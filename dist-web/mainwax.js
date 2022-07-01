@@ -152,6 +152,7 @@ async function startBot() {
         await getUserBags()
         await getTrolley()
         await getUserTools()
+        //await getUserTools2() - need daw pass for repairall and mineall
     }
 }
 
@@ -202,6 +203,11 @@ async function getTrolley() {
     rowTrolley.empty()
     for (var i=0; i<trolley.length; i++) {
         var trolleyName = "trolley-" + trolley[i].asset_id
+
+        if (trolley[i].build_counter != 10) {
+            addLog("Warning! Please build path for trolley. ", trolleyName, 1, 'list-group-item-warning')
+            break
+        }
 
         var journey = await getJourneyDuration(trolley[i])
         if (new Date(trolley[i].next_action_time * 1000) < new Date() && journey == trolley[i].push_counter) {
@@ -438,7 +444,39 @@ async function getUserTools() {
             await getUserBalance()
             await updateUserToolsAfterMining()
         }
-        await reload(60*60*1000)
+        reloadSched(60*60*1000)
+    }
+}
+
+async function getUserTools2() {
+    userTools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
+    console.log(userTools)
+
+    if (userTools.length == 0) {
+        addLog("Error No Available Digger Tools","Please buy a digger tool at https://wax.atomichub.io/market?collection_name=diggersworld&order=asc&schema_name=tools&sort=price&symbol=WAX", 0, 'list-group-item-danger')
+        return
+    }
+
+    rowTools.empty()
+
+    var toolsNeededToRepair = []
+
+    for (var i=0; i<userTools.length; i++) {
+        tool = userTools[i]
+
+        const tconf = toolsConfs[toolsConfs.map(i => i.template_id).indexOf(tool.template_id)]
+
+        await addTools(tool, tconf)
+        
+        if (userTools[i].durability == 0) {
+            toolsNeededToRepair.push(userTools[i])
+        }
+    }
+
+    if (toolsNeededToRepair.length != 0) {
+        await attemptRepairAllTools(toolsNeededToRepair)
+    } else {
+        await attemptClaimAllTools(userTools)
     }
 }
 
@@ -454,6 +492,10 @@ async function updateUserToolsAfterMining() {
         const tconf = toolsConfs[toolsConfs.map(i => i.template_id).indexOf(tool.template_id)]
 
         await addTools(tool, tconf)
+
+        if (new Date(tool.next_mine * 1000) > new Date()) {
+            reloadSched(new Date(tool.next_mine * 1000).getTime() - new Date().getTime())
+        }
     }
 
 }
@@ -506,8 +548,51 @@ async function onRepairTool(tools, toolName) {
     }
 }
 
+async function attemptRepairAllTools(tools) {
+    var log = "Atempt repair all tool " + assets_ids.length
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    var assets_ids = []
+    for (var i=0; i<tools.length; i++){
+        assets_ids.push(tools[i].asset_id)
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    const actions = $.map(tools, (tool) => {
+        return {
+            account: dappAccount,
+            name: 'repairall',
+            authorization: [{
+                actor: userAccount,
+                permission: 'active',
+            }],
+            data: {
+                asset_owner: userAccount,
+                asset_ids: assets_ids,
+            },
+        }
+    })
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Repair ", "All Tool", actions.length, 'list-group-item-success')
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        await attemptClaimAllTools()
+    } catch (e) {
+        addLog("Error Repair ? " + "All Tool", e, actions.length, 'list-group-item-danger')
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        await attemptRepairAllTools(tools)
+    }
+}
+
 async function onClaimTool(tools, toolName) {
-    var log = "Atempt claim tool " + toolName
+    var log = "Atempt claim tools " + toolName
     processIndicatorElem.text(log)
     addLogInfo(log)
 
@@ -539,6 +624,55 @@ async function onClaimTool(tools, toolName) {
     } catch (e) {
         availableToolToMine = availableToolToMine + 1
         addLog("Error Claim Tool ? " + toolName, e, actions.length, 'list-group-item-danger')
+    }
+}
+
+async function attemptClaimAllTools(tools) {
+
+    if (tools == null) {
+        userTools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
+        console.log(userTools)
+    }
+
+    var log = "Atempt claim all tools"
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    var assets_ids = []
+    for (var i=0; i<tools.length; i++){
+        assets_ids.push(tools[i].asset_id)
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    const actions = $.map(tools, (tool) => {
+        return {
+            account: dappAccount,
+            name: 'mineall',
+            authorization: [{
+                actor: userAccount,
+                permission: 'active',
+            }],
+            data: {
+                owner: userAccount,
+                asset_ids: assets_ids,
+            },
+        }
+    })
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Claim ", "All Tool", actions.length, 'list-group-item-success')
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        await updateUserToolsAfterMining()
+    } catch (e) {
+        addLog("Error Claim ? " + "All Tool", e, actions.length, 'list-group-item-danger')
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        await attemptClaimAllTools(tools)
     }
 }
 
