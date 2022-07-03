@@ -3,7 +3,7 @@ let publicKeys =
   localStorage.getItem('PublicKeys') != null ? JSON.parse(localStorage.getItem('PublicKeys')) : null
 
 var rpcCurrentIndex = localStorage.getItem('rpcIndex') != null ? localStorage.getItem('rpcIndex') : 0
-const listRPC = ['https://wax.greymass.com', 'https://api.tokengamer.io', 'https://wax.pink.gg', 'https://api-idm.wax.io', 'https://api.wax.alohaeos.com', 'https://api.waxsweden.org', 'https://api.wax.greeneosio.com', 'https://chain.wax.io']
+const listRPC = ['https://wax.greymass.com', 'https://api.tokengamer.io', 'https://wax.pink.gg', 'https://api-idm.wax.io', 'https://api.wax.alohaeos.com']
 
 const waxJS = () => {
     if (userAccount != null && publicKeys != null) {
@@ -176,7 +176,7 @@ async function getUserBalance() {
 
 var userBags = []
 async function getUserBags() {
-    var log = "Get available small coal bags for trolley from this account - " + userAccount
+    var log = "Get available SMALL COAL BAG for TROLLEY from this account - " + userAccount
     processIndicatorElem.text(log)
     addLogInfo(log)
 
@@ -189,7 +189,7 @@ async function getUserBags() {
         }
     }
     if (userBags.length == 0) {
-        addLog("Warning", "No small bag coal available in your account", 0, 'list-group-item-warning')
+        addLog("Warning", "No SMALL COAL BAG available in your account", 0, 'list-group-item-warning')
     }
     console.log(userBags)
 }
@@ -200,12 +200,16 @@ async function getTrolley() {
     trolley = (await getFromTableWithKey('trolley', 100, 'name', 1)).rows
     console.log(trolley)
 
+    if (trolley.length == 0) {
+        addLog("Warning", "No TROLLEY available in your account", 0, 'list-group-item-warning')
+    }
+
     rowTrolley.empty()
     for (var i=0; i<trolley.length; i++) {
         var trolleyName = "trolley-" + trolley[i].asset_id
 
         if (trolley[i].build_counter != 10) {
-            addLog("Warning! Please build path for trolley. ", trolleyName, 1, 'list-group-item-warning')
+            addLog("Warning! Please build path for TROLLEY. ", trolleyName, 1, 'list-group-item-warning')
             break
         }
 
@@ -213,8 +217,11 @@ async function getTrolley() {
         if (new Date(trolley[i].next_action_time * 1000) < new Date() && journey == trolley[i].push_counter) {
             if (trolley[i].journey_type != '') {
                 await claimJourney([trolley[i]])
+                await new Promise(resolve => setTimeout(resolve, 10000))
+                await startNewJourney([trolley[i]])
             } else {
                 await startNewJourney([trolley[i]])
+                await new Promise(resolve => setTimeout(resolve, 10000))
             }
         } else {
             addLog("Still on current Journey - No need to start new one.", trolleyName, 1, 'list-group-item-info')
@@ -234,6 +241,7 @@ async function onAttemptPushTrolley(trolley, trolleyName) {
     } else {
         if (userBags.length == 0) {
             await buySmallBagofCoal([trolley])
+            await new Promise(resolve => setTimeout(resolve, 5000))
         }
         await onPushTrolley([trolley])
     }
@@ -275,7 +283,7 @@ async function claimJourney(trolleys) {
 
 async function startNewJourney(trolleys) {
     var name = "trolley-" + trolley[0].asset_id
-    var log = "Atempt start new journey " + name
+    var log = "Atempt to start a new journey " + name
     processIndicatorElem.text(log)
     addLogInfo(log)
 
@@ -309,7 +317,7 @@ async function startNewJourney(trolleys) {
 }
 
 async function buySmallBagofCoal(trolleys) {
-    var log = "Atempt buy small bag of coal "
+    var log = "Atempt to buy SMALL COAL BAG "
     processIndicatorElem.text(log)
 
     addLogInfo(log)
@@ -337,18 +345,18 @@ async function buySmallBagofCoal(trolleys) {
             blocksBehind: 3,
             expireSeconds: 30,
         });
-        addLog("Success Buy", "Small bag of coal", actions.length, 'list-group-item-success')
+        addLog("Success Buy", "SMALL COAL BAG", actions.length, 'list-group-item-success')
         await new Promise(resolve => setTimeout(resolve, 10000));
         await getUserBags()
     } catch (e) {
-        addLog("Error Buy ? " + "Small bag of coal", e, actions.length, 'list-group-item-danger')
+        addLog("Error Buy ? " + "SMALL COAL BAG", e, actions.length, 'list-group-item-danger')
     }
 }
 
 async function onPushTrolley(trolleys) {
     if (userBags.length != 0) {
         var name = "trolley-" + trolleys[0].asset_id + "; small coal bag-" + userBags[0].asset_id
-        var log = "Atempt push " + name
+        var log = "Atempt to push " + name
         processIndicatorElem.text(log)
         addLogInfo(log)
 
@@ -384,7 +392,7 @@ async function onPushTrolley(trolleys) {
             await getTrolley()
         }
     } else {
-        addLog("Warning", "Cannot push trolley without small bag coal available in your account", 0, 'list-group-item-warning')
+        addLog("Warning", "Cannot push TROLLEY without SMALL COAL BAG available in your account", 0, 'list-group-item-warning')
         await buySmallBagofCoal(trolleys)
         await getTrolley()
     }
@@ -502,7 +510,7 @@ async function updateUserToolsAfterMining() {
 
 var availableToolToMine = 0
 async function attemptClaimTool(tool, toolName) {
-    processIndicatorElem.text("Check tool status " + toolName)
+    processIndicatorElem.text("Check status " + toolName)
     await new Promise(resolve => setTimeout(resolve, 2000))
     if (new Date(tool.next_mine * 1000) > new Date()) {
         addLog("Still mining", toolName, 1, 'list-group-item-warning')
@@ -515,7 +523,7 @@ async function attemptClaimTool(tool, toolName) {
 
 async function onRepairTool(tools, toolName) {
     if (tools[0].durability == 0) {
-        var log = "Atempt repair tool " + toolName
+        var log = "Atempt to repair tool " + toolName
         processIndicatorElem.text(log)
         addLogInfo(log)
         await new Promise(resolve => setTimeout(resolve, 2000))
@@ -549,7 +557,7 @@ async function onRepairTool(tools, toolName) {
 }
 
 async function attemptRepairAllTools(tools) {
-    var log = "Atempt repair all tool " + assets_ids.length
+    var log = "Atempt to repair all tool " + assets_ids.length
     processIndicatorElem.text(log)
     addLogInfo(log)
 
@@ -592,7 +600,7 @@ async function attemptRepairAllTools(tools) {
 }
 
 async function onClaimTool(tools, toolName) {
-    var log = "Atempt claim tools " + toolName
+    var log = "Atempt to claim tool " + toolName
     processIndicatorElem.text(log)
     addLogInfo(log)
 
@@ -710,7 +718,7 @@ async function countDownTimer(id, countDownDate) {
 
 async function addTools(tool, tconf) {
     rowTools.append('<li class="list-group-item d-flex justify-content-between align-items-center">' +
-        '<span class=" text-left col-6 tool-name">' + tconf.template_name + "-" + tconf.rarity + '</span>' +
+        '<span class=" text-left col-6 tool-name">' + tconf.template_name + "-" + tconf.rarity + ":" + tool.type + '</span>' +
         '<span class="text-right col-1">' + tool.durability+'/'+tconf.init_durability + '</span>' +
         //'<span class="text-right col-1">' + 0 + ' wax</span>' +
         '<span class="badge badge-primary badge-pill col-2" style="width: 80px;" id="' + tool.asset_id + '">' + countDownTimerTools(tool) + '</span>' +
