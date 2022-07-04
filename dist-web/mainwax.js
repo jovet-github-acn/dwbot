@@ -149,7 +149,6 @@ async function startBot() {
     } else {
         await getToolsConfig()
         await getUserBalance()
-        await getUserBags()
         await getTrolley()
         await getUserTools()
         //await getUserTools2() - need daw pass for repairall and mineall
@@ -201,7 +200,9 @@ async function getTrolley() {
     console.log(trolley)
 
     if (trolley.length == 0) {
-        addLog("Warning", "No TROLLEY available in your account", 0, 'list-group-item-warning')
+        addLog("Info", "No TROLLEY available in your account", 0, 'list-group-item-info')
+    } else {
+        await getUserBags()
     }
 
     rowTrolley.empty()
