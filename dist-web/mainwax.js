@@ -3,7 +3,7 @@ let publicKeys =
   localStorage.getItem('PublicKeys') != null ? JSON.parse(localStorage.getItem('PublicKeys')) : null
 
 var rpcCurrentIndex = localStorage.getItem('rpcIndex') != null ? localStorage.getItem('rpcIndex') : 0
-const listRPC = ['https://wax.greymass.com', 'https://api.tokengamer.io', 'https://wax.pink.gg', 'https://api-idm.wax.io', 'https://api.wax.alohaeos.com']
+const listRPC = ['https://api.tokengamer.io', 'https://wax.greymass.com', 'https://wax.pink.gg']
 
 const waxJS = () => {
     if (userAccount != null && publicKeys != null) {
@@ -37,6 +37,9 @@ const logElem = $("#logs")
 const btnStartStopBotElem = $("#btn-start-stop-bot")
 const rpcMenuButton = $("#rpc-menu-button")
 const rpcMenuDropdown = $("#rpc-menu-dropdown")
+
+const smallBagOfCoal = "SMALL BAG OF COAL"
+const accessMinePassConst = "\"Access to the mine\" pass"
 
 populateRPC()
 
@@ -134,7 +137,9 @@ async function checkLoginState() {
         const startedBot = localStorage.getItem("started-bot")
         if (startedBot != null) {
             btnStartStopBotElem.click()
-        } 
+        } else {
+            await onStartBot() 
+        }
     } else {
         $("#login-container").show()
         $("#bot-container").hide()
@@ -147,12 +152,17 @@ async function startBot() {
         await login()
         return console.log("Not logged")
     } else {
-        await getToolsConfig()
-        await getUserBalance()
-        await getTrolley()
-        await getUserTools()
-        //await getUserTools2() - need daw pass for repairall and mineall
+        await onStartBot()
     }
+}
+
+async function onStartBot() {
+    await getToolsConfig()
+    await getUserBalance()
+    await getAcessMinePass()
+    await getTrolley()
+    await getLandsConf()
+    await getTools()
 }
 
 var toolsConfs
@@ -175,7 +185,7 @@ async function getUserBalance() {
 
 var userBags = []
 async function getUserBags() {
-    var log = "Get available SMALL COAL BAG for TROLLEY from this account - " + userAccount
+    var log = "Get available " + smallBagOfCoal + " for TROLLEY from this account - " + userAccount
     processIndicatorElem.text(log)
     addLogInfo(log)
 
@@ -188,7 +198,9 @@ async function getUserBags() {
         }
     }
     if (userBags.length == 0) {
-        addLog("Warning", "No SMALL COAL BAG available in your account", 0, 'list-group-item-warning')
+        addLog("Warning", "No " + smallBagOfCoal + " available in your account", 0, 'list-group-item-warning')
+    } else {
+        addLog(userAccount,  "You have " + userBags.length + " " + smallBagOfCoal, userBags.length, 'list-group-item-success')
     }
     console.log(userBags)
 }
@@ -207,7 +219,7 @@ async function getTrolley() {
 
     rowTrolley.empty()
     for (var i=0; i<trolley.length; i++) {
-        var trolleyName = "trolley-" + trolley[i].asset_id
+        var trolleyName = "Trolley-" + trolley[i].asset_id
 
         if (trolley[i].build_counter != 10) {
             addLog("Warning! Please build path for TROLLEY. ", trolleyName, 1, 'list-group-item-warning')
@@ -215,7 +227,7 @@ async function getTrolley() {
         }
 
         var journey = await getJourneyDuration(trolley[i])
-        if (new Date(trolley[i].next_action_time * 1000) < new Date() && journey == trolley[i].push_counter) {
+        if (new Date(trolley[i].next_action_time * 1000) < new Date() && journey == trolley[i].push_counter && start == true) {
             if (trolley[i].journey_type != '') {
                 await claimJourney([trolley[i]])
                 await new Promise(resolve => setTimeout(resolve, 10000))
@@ -239,7 +251,7 @@ async function onAttemptPushTrolley(trolley, trolleyName) {
     if (new Date(trolley.next_action_time * 1000) > new Date()) {
         addLog("Still mining", trolleyName, 1, 'list-group-item-warning')
         reloadSched(new Date(trolley.next_action_time * 1000).getTime() - new Date().getTime())
-    } else {
+    } else if (start == true){
         if (userBags.length == 0) {
             await buySmallBagofCoal([trolley])
             await new Promise(resolve => setTimeout(resolve, 5000))
@@ -249,7 +261,7 @@ async function onAttemptPushTrolley(trolley, trolleyName) {
 }
 
 async function claimJourney(trolleys) {
-    var name = "trolley-" + trolley[0].asset_id
+    var name = "Trolley-" + trolley[0].asset_id
     var log = "Claim journey " + name
     processIndicatorElem.text(log)
     addLogInfo(log)
@@ -283,7 +295,7 @@ async function claimJourney(trolleys) {
 }
 
 async function startNewJourney(trolleys) {
-    var name = "trolley-" + trolley[0].asset_id
+    var name = "Trolley-" + trolley[0].asset_id
     var log = "Atempt to start a new journey " + name
     processIndicatorElem.text(log)
     addLogInfo(log)
@@ -300,7 +312,7 @@ async function startNewJourney(trolleys) {
             }],
             data: {
                 asset_owner: userAccount,
-                short_j: true,
+                short_j: false,
             },
         }
     })
@@ -318,7 +330,7 @@ async function startNewJourney(trolleys) {
 }
 
 async function buySmallBagofCoal(trolleys) {
-    var log = "Atempt to buy SMALL COAL BAG "
+    var log = "Atempt to buy " + smallBagOfCoal + " "
     processIndicatorElem.text(log)
 
     addLogInfo(log)
@@ -346,17 +358,17 @@ async function buySmallBagofCoal(trolleys) {
             blocksBehind: 3,
             expireSeconds: 30,
         });
-        addLog("Success Buy", "SMALL COAL BAG", actions.length, 'list-group-item-success')
+        addLog("Success Buy", smallBagOfCoal, actions.length, 'list-group-item-success')
         await new Promise(resolve => setTimeout(resolve, 10000));
         await getUserBags()
     } catch (e) {
-        addLog("Error Buy ? " + "SMALL COAL BAG", e, actions.length, 'list-group-item-danger')
+        addLog("Error Buy ? " + smallBagOfCoal, e, actions.length, 'list-group-item-danger')
     }
 }
 
 async function onPushTrolley(trolleys) {
     if (userBags.length != 0) {
-        var name = "trolley-" + trolleys[0].asset_id + "; small coal bag-" + userBags[0].asset_id
+        var name = "Trolley-" + trolleys[0].asset_id + "; small bag of coal-" + userBags[0].asset_id
         var log = "Atempt to push " + name
         processIndicatorElem.text(log)
         addLogInfo(log)
@@ -387,13 +399,15 @@ async function onPushTrolley(trolleys) {
                 expireSeconds: 30,
             });
             addLog("Success Push Trolley", name, actions.length, 'list-group-item-success')
+            await new Promise(resolve => setTimeout(resolve, 5000));
             await updateTrolley()
         } catch (e) {
             addLog("Error Push Trolley ? " + name, e, actions.length, 'list-group-item-danger')
+            await new Promise(resolve => setTimeout(resolve, 5000));
             await getTrolley()
         }
     } else {
-        addLog("Warning", "Cannot push TROLLEY without SMALL COAL BAG available in your account", 0, 'list-group-item-warning')
+        addLog("Warning", "Cannot push TROLLEY without " + smallBagOfCoal + " available in your account", 0, 'list-group-item-warning')
         await buySmallBagofCoal(trolleys)
         await getTrolley()
     }
@@ -406,7 +420,7 @@ async function updateTrolley() {
 
     rowTrolley.empty()
     for (var i=0; i<trolley.length; i++) {
-        var trolleyName = "trolley-" + trolley[i].asset_id
+        var trolleyName = "Trolley-" + trolley[i].asset_id
 
         userBags.shift() // this will remove used bag at 1st index - no need to refetch the userBags to reduce the usage of cpu
         await addTrolley(trolley[i], trolleyName)
@@ -417,15 +431,269 @@ async function updateTrolley() {
     }
 }
 
+var accessMinePassHolder
+async function getAcessMinePass() {
+    var log = "Get available " + accessMinePassConst + " for eligibility of CLAIM/REPAIR ALL from this account - " + userAccount
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    userAssets = (await getFromTableDynamic(dappAccount, dappAccount, 'passes', 1000, userAccount)).rows
+
+    for (var i=0; i<userAssets.length; i++) {
+        var asset = userAssets[i]
+        if (asset.template_id == 494331) {
+            accessMinePassHolder = asset
+            break
+        }
+    }
+    if (accessMinePassHolder == null) {
+        addLog("Warning", "No " + accessMinePassConst + " available in your account", 0, 'list-group-item-warning')
+    } else {
+        addLog("Hooorah", "You're eligible to use the REPAIR/CLAIM ALL functionality. This feature will reduce the CPU usage.", 0, 'list-group-item-success')
+    }
+    console.log(accessMinePassHolder)
+}
+
+var commonLands = []
+var rareLands = []
+var mythicLands = []
+async function getLandsConf() {
+    var log = "Get available land territory"
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    var landsConf = (await getFromTableWithoutBound('territories', 100)).rows
+
+    if (landsConf != null && landsConf.length != 0) {
+        await sortResults(landsConf, 'commision', true)
+    }
+
+    var currentTerritoryLandSelected = localStorage.getItem("TerritoryLandSelected") != null ? JSON.parse(localStorage.getItem("TerritoryLandSelected")) : null
+    if (currentTerritoryLandSelected != null) {
+        addLogInfo("Current Land Territory Selected - AssetID:" + currentTerritoryLandSelected.asset_id + " / Rarity:" + getLandRarity(currentTerritoryLandSelected.template_id) + " / Commision:" + currentTerritoryLandSelected.commision+"%")
+    } else {
+        addLog("Warning", "No Selected Land Territory", 0, 'list-group-item-warning')
+    }
+
+    for (var i=0; i<landsConf.length; i++) {
+        var land = landsConf[i]
+        if (currentTerritoryLandSelected == null || currentTerritoryLandSelected.asset_id != land.asset_id) {
+            if (land.template_id == 543435 && land.players_counter != 30) {
+                commonLands.push(land)
+            } else if (land.template_id == 543436 && land.players_counter != 34) {
+                rareLands.push(land)
+            } else if (land.template_id == 543437 && land.players_counter != 37) {
+                mythicLands.push(land)
+            }
+        }
+    }
+    if (commonLands.length == 0) {
+        addLog("Common", "No land territory available", 0, 'list-group-item-warning')
+    } else {
+        addLog("Common", commonLands.length + " land territory available.", commonLands.length, 'list-group-item-success')
+    }
+    if (rareLands.length == 0) {
+        addLog("Rare", "No land territory available", 0, 'list-group-item-warning')
+    } else {
+        addLog("Rare", rareLands.length + " land territory available.", rareLands.length, 'list-group-item-success')
+    }
+    if (mythicLands.length == 0) {
+        addLog("Mythic", "No land territory available", 0, 'list-group-item-warning')
+    } else {
+        addLog("Mythic", mythicLands.length + " land territory available.", mythicLands.length, 'list-group-item-success')
+    }
+    console.log(commonLands)
+    console.log(rareLands)
+    console.log(mythicLands)
+}
+
+async function attemptToJoinLandTerritory() {
+
+    if (userTools.length == 0) return
+    
+    var toolsReadyToMine = false
+    for (var i=0; i<userTools.length; i++) {
+        tool = userTools[i]
+
+        if (new Date() > new Date(tool.next_mine * 1000)) {
+            toolsReadyToMine = true
+            break
+        }
+    }
+
+    if (toolsReadyToMine) {
+        var currentTerritoryLandSelected = localStorage.getItem("TerritoryLandSelected") != null ? JSON.parse(localStorage.getItem("TerritoryLandSelected")) : null
+
+        if (mythicLands.length != 0) {
+            await searchLandTerritoryAtTheBestOption(mythicLands[0], currentTerritoryLandSelected, "Mythic")
+        } else if (rareLands.length != 0) {
+            await searchLandTerritoryAtTheBestOption(rareLands[0], currentTerritoryLandSelected, "Rare")
+        } else if (commonLands.length != 0) {
+            await searchLandTerritoryAtTheBestOption(commonLands[0], currentTerritoryLandSelected, "Common")
+        } else if (currentTerritoryLandSelected != null) {
+            await messageBestLand(currentTerritoryLandSelected)
+        } else {
+            addLog("No Available Land Territory", "Please try again later.", 0, 'list-group-item-danger')
+        }
+    }
+}
+
+async function searchLandTerritoryAtTheBestOption(land, currentLand, rarity) {
+    if (currentLand == null) {
+        await joinLandTerritoryAtTheBestOption(land, rarity)
+    } else if (land.template_id == 543437) {
+        if (land.template_id == currentLand.template_id && land.commision <= 3 && land.commision < currentLand.commision) {
+            await joinLandTerritoryAtTheBestOption(land, rarity)
+        } else if (land.commision <= 3) {
+            await joinLandTerritoryAtTheBestOption(land, rarity)
+        } else {
+            await messageBestLand(currentLand)
+        }
+    } else if (land.template_id == 543436 || land.template_id == 543435){
+        if (land.template_id == currentLand.template_id && land.commision < currentLand.commision) {
+            await joinLandTerritoryAtTheBestOption(land, rarity)
+        } else if (land.commision <= 5 && currentLand.template_id != 543437) {
+            await joinLandTerritoryAtTheBestOption(land, rarity)
+        } else {
+            await messageBestLand(currentLand)
+        }
+    } else {
+        await messageBestLand(currentLand)
+    }
+}
+
+async function messageBestLand(land) {
+    var landName = "Land Territory(" + getLandRarity(land.template_id) + ") - " + land.asset_id
+    addLog("No Need To Join Land Territory", "As for now you've already joined at the best " + landName, 0, 'list-group-item-warning')
+}
+
+function getLandRarity(template_id) {
+    if (template_id == 543435) {
+        return 'Common'
+    } else if (template_id == 543436) {
+        return 'Rare'
+    } else if (template_id == 543437) {
+        return 'Mythic'
+    }
+}
+
+async function joinLandTerritoryAtTheBestOption(land, rarity) {
+
+    localStorage.setItem("TerritoryLandSelected", JSON.stringify(land))
+
+    var landName = "Land Territory(" + rarity + ") - " + land.asset_id
+
+    var log = "Attempt to join " + landName
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+    
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    const actions = [{
+        account: dappAccount,
+        name: 'jointerr',
+        authorization: [{
+            actor: userAccount,
+            permission: 'active',
+        }],
+        data: {
+            player: userAccount,
+            index: land.index,
+        },
+    }]
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Joined ", landName, actions.length, 'list-group-item-success')
+        await new Promise(resolve => setTimeout(resolve, 5000))
+    } catch (e) {
+        addLog("Failed to Join ? " + landName, e, actions.length, 'list-group-item-danger')
+        await new Promise(resolve => setTimeout(resolve, 5000))
+    }
+}
+
+async function sortResults(array, field, asc) {
+    array.sort(function(a, b) {
+        if (asc) {
+            return (a[field] > b[field]) ? 1 : ((a[field] < b[field]) ? -1 : 0);
+        } else {
+            return (b[field] > a[field]) ? 1 : ((b[field] < a[field]) ? -1 : 0);
+        }
+    })
+}
+
+async function getTools() {
+    if (accessMinePassHolder == null) {
+        await getUserToolsWithoutPass()
+    } else {
+        await getUserToolsWithPass()
+    }
+ 
+}
+
 var userTools
-async function getUserTools() {
+async function getUserToolsWithPass() {
+
     userTools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
     console.log(userTools)
 
     if (userTools.length == 0) {
         addLog("Error No Available Digger Tools","Please buy a digger tool at https://wax.atomichub.io/market?collection_name=diggersworld&order=asc&schema_name=tools&sort=price&symbol=WAX", 0, 'list-group-item-danger')
         return
+    } 
+    
+    await attemptToJoinLandTerritory()
+
+    rowTools.empty()
+
+    var toolsNeededToRepair = []
+    var toolsReadyToMine = []
+
+    for (var i=0; i<userTools.length; i++) {
+        tool = userTools[i]
+
+        const tconf = toolsConfs[toolsConfs.map(i => i.template_id).indexOf(tool.template_id)]
+
+        await addTools(tool, tconf)
+        
+        if (tool.durability != tconf.init_durability) {
+            toolsNeededToRepair.push(tool)
+        }
+        if (new Date() > new Date(tool.next_mine * 1000)) {
+            toolsReadyToMine.push(tool)
+        } else {
+            reloadSched(new Date(tool.next_mine * 1000).getTime() - new Date().getTime())
+        }
     }
+
+    if (toolsNeededToRepair.length != 0 && start == true) {
+        console.log(toolsNeededToRepair)
+        await repairAllTools(toolsNeededToRepair)
+    }
+    if (toolsReadyToMine.length != 0 && start == true) {
+        console.log(toolsReadyToMine)
+        await claimAllTools(toolsReadyToMine)
+    }
+    if (toolsReadyToMine == 0 && toolsReadyToMine == 0) {
+        processIndicatorElem.text("This page will reload after 1 hour")
+        addLog("Still mining ", "All tools.", userTools.length, 'list-group-item-warning')
+    }
+}
+
+async function getUserToolsWithoutPass() {
+    userTools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
+    console.log(userTools)
+
+    if (userTools.length == 0) {
+        addLog("Error No Available Digger Tools","Please buy a digger tool at https://wax.atomichub.io/market?collection_name=diggersworld&order=asc&schema_name=tools&sort=price&symbol=WAX", 0, 'list-group-item-danger')
+        return
+    } 
+
+    await attemptToJoinLandTerritory()
 
     availableToolToMine = 0 // # claim tool failed - refetch getUserTools and do mining again
     totalClaimedTools = 0   // # claimed tool success - 0 will not refetch the getUserBalance & updateUserToolsAfterMining
@@ -457,72 +725,21 @@ async function getUserTools() {
     }
 }
 
-async function getUserTools2() {
-    userTools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
-    console.log(userTools)
-
-    if (userTools.length == 0) {
-        addLog("Error No Available Digger Tools","Please buy a digger tool at https://wax.atomichub.io/market?collection_name=diggersworld&order=asc&schema_name=tools&sort=price&symbol=WAX", 0, 'list-group-item-danger')
-        return
-    }
-
-    rowTools.empty()
-
-    var toolsNeededToRepair = []
-
-    for (var i=0; i<userTools.length; i++) {
-        tool = userTools[i]
-
-        const tconf = toolsConfs[toolsConfs.map(i => i.template_id).indexOf(tool.template_id)]
-
-        await addTools(tool, tconf)
-        
-        if (userTools[i].durability == 0) {
-            toolsNeededToRepair.push(userTools[i])
-        }
-    }
-
-    if (toolsNeededToRepair.length != 0) {
-        await attemptRepairAllTools(toolsNeededToRepair)
-    } else {
-        await attemptClaimAllTools(userTools)
-    }
-}
-
-
-async function updateUserToolsAfterMining() {
-    userTools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
-    console.log(userTools)
-
-    rowTools.empty()
-    for (var i=0; i<userTools.length; i++) {
-        tool = userTools[i]
-
-        const tconf = toolsConfs[toolsConfs.map(i => i.template_id).indexOf(tool.template_id)]
-
-        await addTools(tool, tconf)
-
-        if (new Date(tool.next_mine * 1000) > new Date()) {
-            reloadSched(new Date(tool.next_mine * 1000).getTime() - new Date().getTime())
-        }
-    }
-
-}
-
 var availableToolToMine = 0
+var totalClaimedTools = 0
 async function attemptClaimTool(tool, toolName) {
     processIndicatorElem.text("Check status " + toolName)
     await new Promise(resolve => setTimeout(resolve, 2000))
     if (new Date(tool.next_mine * 1000) > new Date()) {
         addLog("Still mining", toolName, 1, 'list-group-item-warning')
         reloadSched(new Date(tool.next_mine * 1000).getTime() - new Date().getTime())
-    } else {
-        await onRepairTool([tool], toolName)
-        await onClaimTool([tool], toolName)
+    } else if (start == true) {
+        await repairTool([tool], toolName)
+        await claimTool([tool], toolName)
     }
 }
 
-async function onRepairTool(tools, toolName) {
+async function repairTool(tools, toolName) {
     if (tools[0].durability == 0) {
         var log = "Atempt to repair tool " + toolName
         processIndicatorElem.text(log)
@@ -557,50 +774,7 @@ async function onRepairTool(tools, toolName) {
     }
 }
 
-async function attemptRepairAllTools(tools) {
-    var log = "Atempt to repair all tool " + assets_ids.length
-    processIndicatorElem.text(log)
-    addLogInfo(log)
-
-    var assets_ids = []
-    for (var i=0; i<tools.length; i++){
-        assets_ids.push(tools[i].asset_id)
-    }
-    
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
-    const actions = $.map(tools, (tool) => {
-        return {
-            account: dappAccount,
-            name: 'repairall',
-            authorization: [{
-                actor: userAccount,
-                permission: 'active',
-            }],
-            data: {
-                asset_owner: userAccount,
-                asset_ids: assets_ids,
-            },
-        }
-    })
-    try {
-        const result = await wax.api.transact({
-            actions: actions
-        }, {
-            blocksBehind: 3,
-            expireSeconds: 30,
-        });
-        addLog("Success Repair ", "All Tool", actions.length, 'list-group-item-success')
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        await attemptClaimAllTools()
-    } catch (e) {
-        addLog("Error Repair ? " + "All Tool", e, actions.length, 'list-group-item-danger')
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        await attemptRepairAllTools(tools)
-    }
-}
-
-async function onClaimTool(tools, toolName) {
+async function claimTool(tools, toolName) {
     var log = "Atempt to claim tool " + toolName
     processIndicatorElem.text(log)
     addLogInfo(log)
@@ -636,38 +810,50 @@ async function onClaimTool(tools, toolName) {
     }
 }
 
-async function attemptClaimAllTools(tools) {
+async function updateUserToolsAfterMining() {
+    userTools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
+    console.log(userTools)
 
-    if (tools == null) {
-        userTools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
-        console.log(userTools)
+    rowTools.empty()
+    for (var i=0; i<userTools.length; i++) {
+        tool = userTools[i]
+
+        const tconf = toolsConfs[toolsConfs.map(i => i.template_id).indexOf(tool.template_id)]
+
+        await addTools(tool, tconf)
+
+        if (new Date(tool.next_mine * 1000) > new Date()) {
+            reloadSched(new Date(tool.next_mine * 1000).getTime() - new Date().getTime())
+        }
     }
+    processIndicatorElem.text("This page will reload after 1 hour")
+}
 
-    var log = "Atempt claim all tools"
-    processIndicatorElem.text(log)
-    addLogInfo(log)
+async function repairAllTools(tools) {
 
     var assets_ids = []
     for (var i=0; i<tools.length; i++){
         assets_ids.push(tools[i].asset_id)
     }
+
+    var log = "Atempt to repair all tools " + assets_ids.length
+    processIndicatorElem.text(log)
+    addLogInfo(log)
     
     await new Promise(resolve => setTimeout(resolve, 2000))
 
-    const actions = $.map(tools, (tool) => {
-        return {
-            account: dappAccount,
-            name: 'mineall',
-            authorization: [{
-                actor: userAccount,
-                permission: 'active',
-            }],
-            data: {
-                owner: userAccount,
-                asset_ids: assets_ids,
-            },
-        }
-    })
+    const actions = [{
+        account: dappAccount,
+        name: 'repairall',
+        authorization: [{
+            actor: userAccount,
+            permission: 'active',
+        }],
+        data: {
+            asset_owner: userAccount,
+            asset_ids: assets_ids,
+        },
+    }]
     try {
         const result = await wax.api.transact({
             actions: actions
@@ -675,13 +861,67 @@ async function attemptClaimAllTools(tools) {
             blocksBehind: 3,
             expireSeconds: 30,
         });
-        addLog("Success Claim ", "All Tool", actions.length, 'list-group-item-success')
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        addLog("Success Repair ", "All Tools", actions.length, 'list-group-item-success')
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        await getUserBalance()
+        await new Promise(resolve => setTimeout(resolve, 5000))
         await updateUserToolsAfterMining()
     } catch (e) {
-        addLog("Error Claim ? " + "All Tool", e, actions.length, 'list-group-item-danger')
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        await attemptClaimAllTools(tools)
+        addLog("Error Repair ? " + "All Tools", e, actions.length, 'list-group-item-danger')
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        await repairAllTools(tools)
+    }
+}
+
+async function claimAllTools(tools) {
+
+    if (tools == null) {
+        tools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
+        userTools = tools;
+        console.log(userTools)
+    }
+
+    var assets_ids = []
+    for (var i=0; i<tools.length; i++){
+        assets_ids.push(tools[i].asset_id)
+    }
+    console.log(assets_ids)
+
+    var log = "Atempt to claim all tools " + assets_ids.length
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+ 
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    const actions = [{
+        account: dappAccount,
+        name: 'mineall',
+        authorization: [{
+            actor: userAccount,
+            permission: 'active',
+        }],
+        data: {
+            asset_ids: assets_ids,
+            owner: userAccount,
+        },
+    }]
+    console.log(actions)
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Claim ", "All Tools", actions.length, 'list-group-item-success')
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        await getUserBalance()
+        await new Promise(resolve => setTimeout(resolve, 5000))
+        await repairAllTools(tools)
+    } catch (e) {
+        addLog("Error Claim ? " + "All Tools", e, actions.length, 'list-group-item-danger')
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        await claimAllTools(tools)
     }
 }
 
@@ -764,19 +1004,19 @@ function addLogInfo(textLog) {
 }
 
 async function reload(time) {
-    console.log("reload(time) was called: " + time)
+    //console.log("reload(time) was called: " + time)
     await new Promise(resolve => setTimeout(resolve, time))
-    console.log("reload(time) was executed")
+    //console.log("reload(time) was executed")
     location.reload(true)
 }
 
 function reloadSched(time) {
-    console.log("reloadSched(time) was called: " + time)
+    //console.log("reloadSched(time) was called: " + time)
     setTimeout(function(){ 
-        console.log("reloadSched(time) was executed")
+        //console.log("reloadSched(time) was executed")
         location.reload(true)
     }, time); 
-    console.log("reloadSched(time) is now at the bottom")
+    //console.log("reloadSched(time) is now at the bottom")
 }
 
 async function getFromTableDynamic(code, scope, table, limit, bound) {

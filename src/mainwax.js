@@ -1,39 +1,69 @@
-// localStorage.clear()
 var userAccount = localStorage.getItem('UserAccount')
 let publicKeys =
   localStorage.getItem('PublicKeys') != null ? JSON.parse(localStorage.getItem('PublicKeys')) : null
 
+var rpcCurrentIndex = localStorage.getItem('rpcIndex') != null ? localStorage.getItem('rpcIndex') : 0
+const listRPC = ['https://api.tokengamer.io', 'https://wax.greymass.com', 'https://wax.pink.gg']
+
 const waxJS = () => {
     if (userAccount != null && publicKeys != null) {
       return {
-        rpcEndpoint: 'https://api.waxsweden.org',
+        rpcEndpoint: listRPC[rpcCurrentIndex],
         tryAutoLogin: true,
         userAccount: userAccount,
         pubKeys: publicKeys,
       }
     } else {
       return {
-        rpcEndpoint: 'https://api.waxsweden.org',
+        rpcEndpoint: listRPC[rpcCurrentIndex],
         tryAutoLogin: true,
       }
     }
   }
-// var userAccount = wax.userAccount;
 
 var wax = new waxjs.WaxJS(waxJS())
 
-const dappAccount = 'saarofficial'
+const dappAccount = 'diggerswgame'
 var enableCatchError = false
 var start = false
-const maxBatchTools = 20
-const maxBatchPlanets = 20
+
+const rowToken = $("#rowtoken")
+const rowTrolley = $("#rowtrolley")
+const rowTools = $("#rowtools")
 
 const processIndicatorElem = $("#process-indicator")
+
 const logElem = $("#logs")
 const btnStartStopBotElem = $("#btn-start-stop-bot")
-const autoTransferLand = document.getElementById("auto-transfer-land")
+const rpcMenuButton = $("#rpc-menu-button")
+const rpcMenuDropdown = $("#rpc-menu-dropdown")
 
-var waitingToClaimForLandTransfer = false
+const smallBagOfCoal = "SMALL BAG OF COAL"
+const accessMinePassConst = "\"Access to the mine\" pass"
+
+populateRPC()
+
+function populateRPC() {
+    listRPC.map(i => {
+        addRPC(i)
+    })
+    selectRPC()
+}
+
+function addRPC(rpc) {
+    rpcMenuDropdown.append('<a class="dropdown-item rpc-item" href="#">' + rpc + '</a>')
+}
+
+$("#rpc-menu-dropdown a").on('click', function(){
+    rpcCurrentIndex = listRPC.indexOf($(this).text())
+    rpcMenuButton.text(listRPC[rpcCurrentIndex])
+    console.log("rpc", rpcCurrentIndex)
+});
+
+function selectRPC() {
+    rpcMenuButton.text(listRPC[rpcCurrentIndex])
+    rpcCurrentIndex = listRPC.indexOf(rpcMenuButton.text())
+}
 
 $("#btn-login").click(async () => {
     await login()
@@ -41,18 +71,8 @@ $("#btn-login").click(async () => {
 
 $("#btn-logout").click(() => {
     localStorage.clear()
-    location.reload()
+    location.reload(true)
 })
-
-autoTransferLand.addEventListener('change', e => {
-    localStorage.setItem("auto-transfer-land", e.target.checked);
-    console.log("change", localStorage.getItem("auto-transfer-land"))
-});
-
-  const isAutoTransferLand = localStorage.getItem("auto-transfer-land") ? localStorage.getItem("auto-transfer-land") : false;
-    autoTransferLand.checked =  isAutoTransferLand
-    console.log("isAutoTransferLand", isAutoTransferLand)
-    console.log("autoTransferLand.checked", autoTransferLand.checked)
 
 btnStartStopBotElem.click(async () => {
     await startStopBot()
@@ -68,8 +88,8 @@ async function startStopBot() {
         btnStartStopBotElem.toggleClass('btn-danger')
 
         processIndicatorElem.text("")
-        logElem.empty()
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
     } else {
         start = true
         localStorage.setItem("started-bot", true);
@@ -79,7 +99,6 @@ async function startStopBot() {
         btnStartStopBotElem.toggleClass('btn-danger')
 
         processIndicatorElem.text("Starting Bot")
-        addLogInfo('Starting Bot')
         await startBot()
     }
 }
@@ -91,9 +110,12 @@ async function checkStoredUser() {
 
 async function login() {
     try {
+        wax = new waxjs.WaxJS(waxJS())
         userAccount = await wax.login();
+        console.log("rpcIndex login", rpcCurrentIndex)
         localStorage.setItem("UserAccount", userAccount);
         localStorage.setItem("PublicKeys", JSON.stringify(wax.pubKeys))
+        localStorage.setItem("rpcIndex", rpcCurrentIndex);
         console.log('wax', wax)
         await checkLoginState()
     } catch (e) {
@@ -102,43 +124,893 @@ async function login() {
 }
 
 async function checkLoginState() {
+    btnStartStopBotElem.prop("disabled", true)
     if (userAccount != null) {
         $("#login-container").hide()
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 1000))
         $("#bot-container").show()
-        await new Promise(resolve => setTimeout(resolve, 10000));
-        const user = await getUser()
-        setupTokens(user)
-        const startedBot = localStorage.getItem("started-bot");
+        await new Promise(resolve => setTimeout(resolve, 1000))
+
+        console.log('user', userAccount)
+
+        btnStartStopBotElem.prop("disabled", false)
+        const startedBot = localStorage.getItem("started-bot")
         if (startedBot != null) {
             btnStartStopBotElem.click()
-        } 
+        } else {
+            await onStartBot() 
+        }
     } else {
         $("#login-container").show()
         $("#bot-container").hide()
     }
 }
 
-function setupTokens(user) {
-    const balances = user.balances
-
-    const sre = tokenIndex(balances, "E") > -1 ? balances[tokenIndex(balances, "E")].split(" ")[0] : 0
-    const srm = tokenIndex(balances, "M") > -1 ? balances[tokenIndex(balances, "M")].split(" ")[0] : 0
-    const srw = tokenIndex(balances, "W") > -1 ? balances[tokenIndex(balances, "W")].split(" ")[0] : 0
-    const srs = tokenIndex(balances, "S") > -1 ? balances[tokenIndex(balances, "S")].split(" ")[0] : 0
-    $("#sre").text(numberWithCommas(sre) + " SRE")
-    $("#srm").text(numberWithCommas(srm) + " SRM")
-    $("#srw").text(numberWithCommas(srw) + " SRW")
-    $("#srs").text(numberWithCommas(srs) + " SRS")
+async function startBot() {
+    if (!wax.api) {
+        await new Promise(resolve => setTimeout(resolve, 5000))
+        await login()
+        return console.log("Not logged")
+    } else {
+        await onStartBot()
+    }
 }
 
-function tokenIndex(balances, key) {
-    return balances.map(i => i.split(' ')[1]).indexOf(key)
+async function onStartBot() {
+    await getToolsConfig()
+    await getUserBalance()
+    await getAcessMinePass()
+    await getTrolley()
+    await getLandsConf()
+    await getTools()
 }
 
-function numberWithCommas(n) {
-    var parts=n.toString().split(".");
-    return parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (parts[1] ? "." + parts[1] : "");
+var toolsConfs
+async function getToolsConfig() {
+    toolsConfs = (await getFromTableWithBound('toolsconfig', 100, '')).rows
+    console.log(toolsConfs)
+}
+
+var userBalance
+async function getUserBalance() {
+    userBalance = (await getFromTableWithKey('userbalance', 10, '', 1)).rows
+    var balanceToken = userBalance[0].balance
+    console.log(balanceToken)
+
+    rowToken.empty()
+    for (var i=0; i<balanceToken.length; i++) {
+        rowToken.append('<div class="col-sm">'+balanceToken[i]+'</div>')
+    }
+}
+
+var userBags = []
+async function getUserBags() {
+    var log = "Get available " + smallBagOfCoal + " for TROLLEY from this account - " + userAccount
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    userAssets = (await getFromTableDynamic('atomicassets', userAccount, 'assets', 1000, "")).rows
+
+    for (var i=0; i<userAssets.length; i++) {
+        var asset = userAssets[i]
+        if (asset.collection_name = 'diggersworld' && asset.template_id == 530552 && asset.schema_name == 'bags') {
+            userBags.push(asset)
+        }
+    }
+    if (userBags.length == 0) {
+        addLog("Warning", "No " + smallBagOfCoal + " available in your account", 0, 'list-group-item-warning')
+    } else {
+        addLog(userAccount,  "You have " + userBags.length + " " + smallBagOfCoal, userBags.length, 'list-group-item-success')
+    }
+    console.log(userBags)
+}
+
+
+var trolley
+async function getTrolley() {
+    trolley = (await getFromTableWithKey('trolley', 100, 'name', 1)).rows
+    console.log(trolley)
+
+    if (trolley.length == 0) {
+        addLog("Info", "No TROLLEY available in your account", 0, 'list-group-item-info')
+    } else {
+        await getUserBags()
+    }
+
+    rowTrolley.empty()
+    for (var i=0; i<trolley.length; i++) {
+        var trolleyName = "Trolley-" + trolley[i].asset_id
+
+        if (trolley[i].build_counter != 10) {
+            addLog("Warning! Please build path for TROLLEY. ", trolleyName, 1, 'list-group-item-warning')
+            break
+        }
+
+        var journey = await getJourneyDuration(trolley[i])
+        if (new Date(trolley[i].next_action_time * 1000) < new Date() && journey == trolley[i].push_counter && start == true) {
+            if (trolley[i].journey_type != '') {
+                await claimJourney([trolley[i]])
+                await new Promise(resolve => setTimeout(resolve, 10000))
+                await startNewJourney([trolley[i]])
+            } else {
+                await startNewJourney([trolley[i]])
+                await new Promise(resolve => setTimeout(resolve, 10000))
+            }
+        } else {
+            addLog("Still on current Journey - No need to start new one.", trolleyName, 1, 'list-group-item-info')
+        }
+        await addTrolley(trolley[i], trolleyName)
+        await onAttemptPushTrolley(trolley[i], trolleyName)
+    }
+}
+
+async function onAttemptPushTrolley(trolley, trolleyName) {
+    processIndicatorElem.text("Check status " + trolleyName)
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    if (new Date(trolley.next_action_time * 1000) > new Date()) {
+        addLog("Still mining", trolleyName, 1, 'list-group-item-warning')
+        reloadSched(new Date(trolley.next_action_time * 1000).getTime() - new Date().getTime())
+    } else if (start == true){
+        if (userBags.length == 0) {
+            await buySmallBagofCoal([trolley])
+            await new Promise(resolve => setTimeout(resolve, 5000))
+        }
+        await onPushTrolley([trolley])
+    }
+}
+
+async function claimJourney(trolleys) {
+    var name = "Trolley-" + trolley[0].asset_id
+    var log = "Claim journey " + name
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const actions = $.map(trolleys, (trolley) => {
+        return {
+            account: dappAccount,
+            name: 'claimjourney',
+            authorization: [{
+                actor: userAccount,
+                permission: 'active',
+            }],
+            data: {
+                asset_owner: userAccount,
+            },
+        }
+    })
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Claim Journey", name, actions.length, 'list-group-item-success')
+    } catch (e) {
+        addLog("Error Claim Journey ? " + name, e, actions.length, 'list-group-item-danger')
+    }
+}
+
+async function startNewJourney(trolleys) {
+    var name = "Trolley-" + trolley[0].asset_id
+    var log = "Atempt to start a new journey " + name
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const actions = $.map(trolleys, (trolley) => {
+        return {
+            account: dappAccount,
+            name: 'startjourney',
+            authorization: [{
+                actor: userAccount,
+                permission: 'active',
+            }],
+            data: {
+                asset_owner: userAccount,
+                short_j: false,
+            },
+        }
+    })
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Start New Journey", name, actions.length, 'list-group-item-success')
+    } catch (e) {
+        addLog("Error Start New Journey ? " + name, e, actions.length, 'list-group-item-danger')
+    }
+}
+
+async function buySmallBagofCoal(trolleys) {
+    var log = "Atempt to buy " + smallBagOfCoal + " "
+    processIndicatorElem.text(log)
+
+    addLogInfo(log)
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const actions = $.map(trolleys, (trolley) => {
+        return {
+            account: dappAccount,
+            name: 'buy',
+            authorization: [{
+                actor: userAccount,
+                permission: 'active',
+            }],
+            data: {
+                player: userAccount,
+                template_id: 530552,
+            },
+        }
+    })
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Buy", smallBagOfCoal, actions.length, 'list-group-item-success')
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        await getUserBags()
+    } catch (e) {
+        addLog("Error Buy ? " + smallBagOfCoal, e, actions.length, 'list-group-item-danger')
+    }
+}
+
+async function onPushTrolley(trolleys) {
+    if (userBags.length != 0) {
+        var name = "Trolley-" + trolleys[0].asset_id + "; small bag of coal-" + userBags[0].asset_id
+        var log = "Atempt to push " + name
+        processIndicatorElem.text(log)
+        addLogInfo(log)
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const actions = $.map(trolleys, (trolley) => {
+            return {
+                account: 'atomicassets',
+                name: 'transfer',
+                authorization: [{
+                    actor: userAccount,
+                    permission: 'active',
+                }],
+                data: {
+                    from: userAccount,
+                    to: dappAccount,
+                    memo: 'push',
+                    asset_ids: [userBags[0].asset_id],
+                },
+            }
+        })
+        try {
+            const result = await wax.api.transact({
+                actions: actions
+            }, {
+                blocksBehind: 3,
+                expireSeconds: 30,
+            });
+            addLog("Success Push Trolley", name, actions.length, 'list-group-item-success')
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            await updateTrolley()
+        } catch (e) {
+            addLog("Error Push Trolley ? " + name, e, actions.length, 'list-group-item-danger')
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            await getTrolley()
+        }
+    } else {
+        addLog("Warning", "Cannot push TROLLEY without " + smallBagOfCoal + " available in your account", 0, 'list-group-item-warning')
+        await buySmallBagofCoal(trolleys)
+        await getTrolley()
+    }
+    
+}
+
+async function updateTrolley() {
+    trolley = (await getFromTableWithKey('trolley', 100, 'name', 1)).rows
+    console.log(trolley)
+
+    rowTrolley.empty()
+    for (var i=0; i<trolley.length; i++) {
+        var trolleyName = "Trolley-" + trolley[i].asset_id
+
+        userBags.shift() // this will remove used bag at 1st index - no need to refetch the userBags to reduce the usage of cpu
+        await addTrolley(trolley[i], trolleyName)
+
+        if (new Date(trolley.next_action_time * 1000) > new Date()) {
+            reloadSched(new Date(trolley.next_action_time * 1000).getTime() - new Date().getTime())
+        }
+    }
+}
+
+var accessMinePassHolder
+async function getAcessMinePass() {
+    var log = "Get available " + accessMinePassConst + " for eligibility of CLAIM/REPAIR ALL from this account - " + userAccount
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    userAssets = (await getFromTableDynamic(dappAccount, dappAccount, 'passes', 1000, userAccount)).rows
+
+    for (var i=0; i<userAssets.length; i++) {
+        var asset = userAssets[i]
+        if (asset.template_id == 494331) {
+            accessMinePassHolder = asset
+            break
+        }
+    }
+    if (accessMinePassHolder == null) {
+        addLog("Warning", "No " + accessMinePassConst + " available in your account", 0, 'list-group-item-warning')
+    } else {
+        addLog("Hooorah", "You're eligible to use the REPAIR/CLAIM ALL functionality. This feature will reduce the CPU usage.", 0, 'list-group-item-success')
+    }
+    console.log(accessMinePassHolder)
+}
+
+var commonLands = []
+var rareLands = []
+var mythicLands = []
+async function getLandsConf() {
+    var log = "Get available land territory"
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    var landsConf = (await getFromTableWithoutBound('territories', 100)).rows
+
+    if (landsConf != null && landsConf.length != 0) {
+        await sortResults(landsConf, 'commision', true)
+    }
+
+    var currentTerritoryLandSelected = localStorage.getItem("TerritoryLandSelected") != null ? JSON.parse(localStorage.getItem("TerritoryLandSelected")) : null
+    if (currentTerritoryLandSelected != null) {
+        addLogInfo("Current Land Territory Selected - AssetID:" + currentTerritoryLandSelected.asset_id + " / Rarity:" + getLandRarity(currentTerritoryLandSelected.template_id) + " / Commision:" + currentTerritoryLandSelected.commision+"%")
+    } else {
+        addLog("Warning", "No Selected Land Territory", 0, 'list-group-item-warning')
+    }
+
+    for (var i=0; i<landsConf.length; i++) {
+        var land = landsConf[i]
+        if (currentTerritoryLandSelected == null || currentTerritoryLandSelected.asset_id != land.asset_id) {
+            if (land.template_id == 543435 && land.players_counter != 30) {
+                commonLands.push(land)
+            } else if (land.template_id == 543436 && land.players_counter != 34) {
+                rareLands.push(land)
+            } else if (land.template_id == 543437 && land.players_counter != 37) {
+                mythicLands.push(land)
+            }
+        }
+    }
+    if (commonLands.length == 0) {
+        addLog("Common", "No land territory available", 0, 'list-group-item-warning')
+    } else {
+        addLog("Common", commonLands.length + " land territory available.", commonLands.length, 'list-group-item-success')
+    }
+    if (rareLands.length == 0) {
+        addLog("Rare", "No land territory available", 0, 'list-group-item-warning')
+    } else {
+        addLog("Rare", rareLands.length + " land territory available.", rareLands.length, 'list-group-item-success')
+    }
+    if (mythicLands.length == 0) {
+        addLog("Mythic", "No land territory available", 0, 'list-group-item-warning')
+    } else {
+        addLog("Mythic", mythicLands.length + " land territory available.", mythicLands.length, 'list-group-item-success')
+    }
+    console.log(commonLands)
+    console.log(rareLands)
+    console.log(mythicLands)
+}
+
+async function attemptToJoinLandTerritory() {
+
+    if (userTools.length == 0) return
+    
+    var toolsReadyToMine = false
+    for (var i=0; i<userTools.length; i++) {
+        tool = userTools[i]
+
+        if (new Date() > new Date(tool.next_mine * 1000)) {
+            toolsReadyToMine = true
+            break
+        }
+    }
+
+    if (toolsReadyToMine) {
+        var currentTerritoryLandSelected = localStorage.getItem("TerritoryLandSelected") != null ? JSON.parse(localStorage.getItem("TerritoryLandSelected")) : null
+
+        if (mythicLands.length != 0) {
+            await searchLandTerritoryAtTheBestOption(mythicLands[0], currentTerritoryLandSelected, "Mythic")
+        } else if (rareLands.length != 0) {
+            await searchLandTerritoryAtTheBestOption(rareLands[0], currentTerritoryLandSelected, "Rare")
+        } else if (commonLands.length != 0) {
+            await searchLandTerritoryAtTheBestOption(commonLands[0], currentTerritoryLandSelected, "Common")
+        } else if (currentTerritoryLandSelected != null) {
+            await messageBestLand(currentTerritoryLandSelected)
+        } else {
+            addLog("No Available Land Territory", "Please try again later.", 0, 'list-group-item-danger')
+        }
+    }
+}
+
+async function searchLandTerritoryAtTheBestOption(land, currentLand, rarity) {
+    if (currentLand == null) {
+        await joinLandTerritoryAtTheBestOption(land, rarity)
+    } else if (land.template_id == 543437  && land.commision <= 3) {
+        if (land.commision < currentLand.commision) {
+            await joinLandTerritoryAtTheBestOption(land, rarity)
+        } else {
+            await messageBestLand(currentLand)
+        }
+    } else if ((land.template_id == 543437 || land.template_id == 543436)  && land.commision < currentLand.commision) {
+        await joinLandTerritoryAtTheBestOption(land, rarity)
+    } else if (land.template_id == currentLand.template_id && land.commision < currentLand.commision){
+        await joinLandTerritoryAtTheBestOption(land, rarity)
+    } else {
+        await messageBestLand(currentLand)
+    }
+}
+
+async function messageBestLand(land) {
+    var landName = "Land Territory(" + getLandRarity(land.template_id) + ") - " + land.asset_id
+    addLog("No Need To Join Land Territory", "As for now you've already joined at the best " + landName, 0, 'list-group-item-warning')
+}
+
+function getLandRarity(template_id) {
+    if (template_id == 543435) {
+        return 'Common'
+    } else if (template_id == 543436) {
+        return 'Rare'
+    } else if (template_id == 543437) {
+        return 'Mythic'
+    }
+}
+
+async function joinLandTerritoryAtTheBestOption(land, rarity) {
+
+    localStorage.setItem("TerritoryLandSelected", JSON.stringify(land))
+
+    var landName = "Land Territory(" + rarity + ") - " + land.asset_id
+
+    var log = "Attempt to join " + landName
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+    
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    const actions = [{
+        account: dappAccount,
+        name: 'jointerr',
+        authorization: [{
+            actor: userAccount,
+            permission: 'active',
+        }],
+        data: {
+            player: userAccount,
+            index: land.index,
+        },
+    }]
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Joined ", landName, actions.length, 'list-group-item-success')
+        await new Promise(resolve => setTimeout(resolve, 5000))
+    } catch (e) {
+        addLog("Failed to Join ? " + landName, e, actions.length, 'list-group-item-danger')
+        await new Promise(resolve => setTimeout(resolve, 5000))
+    }
+}
+
+async function sortResults(array, field, asc) {
+    array.sort(function(a, b) {
+        if (asc) {
+            return (a[field] > b[field]) ? 1 : ((a[field] < b[field]) ? -1 : 0);
+        } else {
+            return (b[field] > a[field]) ? 1 : ((b[field] < a[field]) ? -1 : 0);
+        }
+    })
+}
+
+async function getTools() {
+    if (accessMinePassHolder == null) {
+        await getUserToolsWithoutPass()
+    } else {
+        await getUserToolsWithPass()
+    }
+ 
+}
+
+var userTools
+async function getUserToolsWithPass() {
+
+    userTools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
+    console.log(userTools)
+
+    if (userTools.length == 0) {
+        addLog("Error No Available Digger Tools","Please buy a digger tool at https://wax.atomichub.io/market?collection_name=diggersworld&order=asc&schema_name=tools&sort=price&symbol=WAX", 0, 'list-group-item-danger')
+        return
+    } 
+    
+    await attemptToJoinLandTerritory()
+
+    rowTools.empty()
+
+    var toolsNeededToRepair = []
+    var toolsReadyToMine = []
+
+    for (var i=0; i<userTools.length; i++) {
+        tool = userTools[i]
+
+        const tconf = toolsConfs[toolsConfs.map(i => i.template_id).indexOf(tool.template_id)]
+
+        await addTools(tool, tconf)
+        
+        if (tool.durability != tconf.init_durability) {
+            toolsNeededToRepair.push(tool)
+        }
+        if (new Date() > new Date(tool.next_mine * 1000)) {
+            toolsReadyToMine.push(tool)
+        } else {
+            reloadSched(new Date(tool.next_mine * 1000).getTime() - new Date().getTime())
+        }
+    }
+
+    if (toolsNeededToRepair.length != 0 && start == true) {
+        console.log(toolsNeededToRepair)
+        await repairAllTools(toolsNeededToRepair)
+    }
+    if (toolsReadyToMine.length != 0 && start == true) {
+        console.log(toolsReadyToMine)
+        await claimAllTools(toolsReadyToMine)
+    }
+    if (toolsReadyToMine == 0 && toolsReadyToMine == 0) {
+        processIndicatorElem.text("This page will reload after 1 hour")
+        addLog("Still mining ", "All tools.", userTools.length, 'list-group-item-warning')
+    }
+}
+
+async function getUserToolsWithoutPass() {
+    userTools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
+    console.log(userTools)
+
+    if (userTools.length == 0) {
+        addLog("Error No Available Digger Tools","Please buy a digger tool at https://wax.atomichub.io/market?collection_name=diggersworld&order=asc&schema_name=tools&sort=price&symbol=WAX", 0, 'list-group-item-danger')
+        return
+    } 
+
+    await attemptToJoinLandTerritory()
+
+    availableToolToMine = 0 // # claim tool failed - refetch getUserTools and do mining again
+    totalClaimedTools = 0   // # claimed tool success - 0 will not refetch the getUserBalance & updateUserToolsAfterMining
+
+    rowTools.empty()
+
+    for (var i=0; i<userTools.length; i++) {
+        tool = userTools[i]
+
+        const tconf = toolsConfs[toolsConfs.map(i => i.template_id).indexOf(tool.template_id)]
+        const toolName = tconf.template_name + "-" + tconf.type + ':' + tconf.rarity + '-' + tool.asset_id
+
+        await addTools(tool, tconf)
+        await attemptClaimTool(tool, toolName)
+    }
+
+    if (availableToolToMine > 0) {
+        await new Promise(resolve => setTimeout(resolve, 10*1000))
+        await getUserTools()
+    } else {
+        processIndicatorElem.text("This page will reload after 1 hour")
+        //update only if there's any claimed tool
+        if (totalClaimedTools != 0) {
+            await new Promise(resolve => setTimeout(resolve, 5000))
+            await getUserBalance()
+            await updateUserToolsAfterMining()
+        }
+        reloadSched(60*60*1000)
+    }
+}
+
+var availableToolToMine = 0
+var totalClaimedTools = 0
+async function attemptClaimTool(tool, toolName) {
+    processIndicatorElem.text("Check status " + toolName)
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    if (new Date(tool.next_mine * 1000) > new Date()) {
+        addLog("Still mining", toolName, 1, 'list-group-item-warning')
+        reloadSched(new Date(tool.next_mine * 1000).getTime() - new Date().getTime())
+    } else if (start == true) {
+        await repairTool([tool], toolName)
+        await claimTool([tool], toolName)
+    }
+}
+
+async function repairTool(tools, toolName) {
+    if (tools[0].durability == 0) {
+        var log = "Atempt to repair tool " + toolName
+        processIndicatorElem.text(log)
+        addLogInfo(log)
+        await new Promise(resolve => setTimeout(resolve, 2000))
+
+        const actions = $.map(tools, (tool) => {
+            return {
+                account: dappAccount,
+                name: 'trepair',
+                authorization: [{
+                    actor: userAccount,
+                    permission: 'active',
+                }],
+                data: {
+                    asset_owner: userAccount,
+                    asset_id: tool.asset_id,
+                },
+            }
+        })
+        try {
+            const result = await wax.api.transact({
+                actions: actions
+            }, {
+                blocksBehind: 3,
+                expireSeconds: 30,
+            });
+            addLog("Success Repair Tool", toolName, actions.length, 'list-group-item-success')
+        } catch (e) {
+            addLog("Error Repair Tool ? " + toolName, e, actions.length, 'list-group-item-danger')
+        }
+    }
+}
+
+async function claimTool(tools, toolName) {
+    var log = "Atempt to claim tool " + toolName
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const actions = $.map(tools, (tool) => {
+        return {
+            account: dappAccount,
+            name: 'safemine',
+            authorization: [{
+                actor: userAccount,
+                permission: 'active',
+            }],
+            data: {
+                asset_owner: userAccount,
+                asset_id: tool.asset_id,
+            },
+        }
+    })
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        totalClaimedTools = totalClaimedTools + 1
+        addLog("Success Claim Tool", toolName, actions.length, 'list-group-item-success')
+    } catch (e) {
+        availableToolToMine = availableToolToMine + 1
+        addLog("Error Claim Tool ? " + toolName, e, actions.length, 'list-group-item-danger')
+    }
+}
+
+async function updateUserToolsAfterMining() {
+    userTools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
+    console.log(userTools)
+
+    rowTools.empty()
+    for (var i=0; i<userTools.length; i++) {
+        tool = userTools[i]
+
+        const tconf = toolsConfs[toolsConfs.map(i => i.template_id).indexOf(tool.template_id)]
+
+        await addTools(tool, tconf)
+
+        if (new Date(tool.next_mine * 1000) > new Date()) {
+            reloadSched(new Date(tool.next_mine * 1000).getTime() - new Date().getTime())
+        }
+    }
+    processIndicatorElem.text("This page will reload after 1 hour")
+}
+
+async function repairAllTools(tools) {
+
+    var assets_ids = []
+    for (var i=0; i<tools.length; i++){
+        assets_ids.push(tools[i].asset_id)
+    }
+
+    var log = "Atempt to repair all tools " + assets_ids.length
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+    
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    const actions = [{
+        account: dappAccount,
+        name: 'repairall',
+        authorization: [{
+            actor: userAccount,
+            permission: 'active',
+        }],
+        data: {
+            asset_owner: userAccount,
+            asset_ids: assets_ids,
+        },
+    }]
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Repair ", "All Tools", actions.length, 'list-group-item-success')
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        await getUserBalance()
+        await new Promise(resolve => setTimeout(resolve, 5000))
+        await updateUserToolsAfterMining()
+    } catch (e) {
+        addLog("Error Repair ? " + "All Tools", e, actions.length, 'list-group-item-danger')
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        await repairAllTools(tools)
+    }
+}
+
+async function claimAllTools(tools) {
+
+    if (tools == null) {
+        tools = (await getFromTableWithKey('tools', 100, 'name', 2)).rows
+        userTools = tools;
+        console.log(userTools)
+    }
+
+    var assets_ids = []
+    for (var i=0; i<tools.length; i++){
+        assets_ids.push(tools[i].asset_id)
+    }
+    console.log(assets_ids)
+
+    var log = "Atempt to claim all tools " + assets_ids.length
+    processIndicatorElem.text(log)
+    addLogInfo(log)
+ 
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    const actions = [{
+        account: dappAccount,
+        name: 'mineall',
+        authorization: [{
+            actor: userAccount,
+            permission: 'active',
+        }],
+        data: {
+            asset_ids: assets_ids,
+            owner: userAccount,
+        },
+    }]
+    console.log(actions)
+    try {
+        const result = await wax.api.transact({
+            actions: actions
+        }, {
+            blocksBehind: 3,
+            expireSeconds: 30,
+        });
+        addLog("Success Claim ", "All Tools", actions.length, 'list-group-item-success')
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        await getUserBalance()
+        await new Promise(resolve => setTimeout(resolve, 5000))
+        await repairAllTools(tools)
+    } catch (e) {
+        addLog("Error Claim ? " + "All Tools", e, actions.length, 'list-group-item-danger')
+        await new Promise(resolve => setTimeout(resolve, 10000))
+        await claimAllTools(tools)
+    }
+}
+
+async function countDownTimerTools(tool) {
+    var countDownDate = new Date(tool.next_mine * 1000);
+    await countDownTimer(tool.asset_id, countDownDate)
+}
+
+async function countDownTimerTrolley(trolley) {
+    var countDownDate = new Date(trolley.next_action_time * 1000);
+    await countDownTimer(trolley.asset_id, countDownDate)
+}
+
+async function countDownTimer(id, countDownDate) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    $("#"+id).text("Loading")
+    var countDownTime = countDownDate.getTime()
+    var x = setInterval(function() {
+        var now = new Date().getTime();
+
+        var distance = countDownTime - now;
+
+        var hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)).toLocaleString('en-US', {minimumIntegerDigits: 2, useGrouping:false});
+        var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)).toLocaleString('en-US', {minimumIntegerDigits: 2, useGrouping:false});
+        var seconds = Math.floor((distance % (1000 * 60)) / 1000).toLocaleString('en-US', {minimumIntegerDigits: 2, useGrouping:false});
+
+        $("#"+id).text(hours + ":" + minutes + ":" + seconds)
+
+        if (distance < 0) {
+            clearInterval(x);
+            $("#"+id).text("Ready");
+        }
+    }, 1000);
+}
+
+async function addTools(tool, tconf) {
+    rowTools.append('<li class="list-group-item d-flex justify-content-between align-items-center">' +
+        '<span class=" text-left col-6 tool-name">' + tconf.template_name + "-" + tconf.rarity + ":" + tool.type + '</span>' +
+        '<span class="text-right col-1">' + tool.durability+'/'+tconf.init_durability + '</span>' +
+        //'<span class="text-right col-1">' + 0 + ' wax</span>' +
+        '<span class="badge badge-primary badge-pill col-2" style="width: 80px;" id="' + tool.asset_id + '">' + countDownTimerTools(tool) + '</span>' +
+    '</li>')
+}
+
+async function getJourneyDuration(trolley) {
+    if (trolley.journey_type == 'short') {
+        return 24
+    } else if (trolley.journey_type == 'long') {
+        return 60
+    } else {
+        return 0
+    }
+}
+
+async function addTrolley(trolley) {
+    rowTrolley.append('<li class="list-group-item d-flex justify-content-between align-items-center">' +
+        '<span class=" text-left col-6 trolley-name">Trolley-' + trolley.asset_id + '</span>' +
+        '<span class="text-right col-4">' + trolley.push_counter + '/' + await getJourneyDuration(trolley) + ' ('+ userBags.length + ' Bags)</span>' +
+        //'<span class="text-right col-1">' + 0 + ' wax</span>' +
+        '<span class="badge badge-primary badge-pill col-2" style="width: 80px;" id="' + trolley.asset_id + '">' + countDownTimerTrolley(trolley) + '</span>' +
+    '</li>')
+}
+
+var totalWax = 0
+async function addTotalNetProfit() {
+    rowTools.append('<li class="list-group-item d-flex justify-content-between align-items-center">' +
+        '<span class=" text-left col-4 tool-name" >' + 'Total' + '</span>' +
+        '<span class="text-right col-3">' + '' + '</span>' +
+        '<span class="text-right col-3">' + 0 + ' wax</span>' +
+        '<span class="col-2" style="width: 80px;">' + '' + '</span>' +
+    '</li>')
+}
+
+function addLog(tag, textLog, actionsCount, bsClass) {
+    logElem.prepend('<li class="transactional-list list-group-item d-flex justify-content-between align-items-center ' + bsClass + '">' + tag + " : " + textLog + '<span class="badge badge-primary badge-pill">' + actionsCount + '</span></li>')
+}
+
+function addLogInfo(textLog) {
+    logElem.prepend('<li class="non-transactional-list list-group-item list-group-item-info">' + textLog + '</li>')
+}
+
+async function reload(time) {
+    //console.log("reload(time) was called: " + time)
+    await new Promise(resolve => setTimeout(resolve, time))
+    //console.log("reload(time) was executed")
+    location.reload(true)
+}
+
+function reloadSched(time) {
+    //console.log("reloadSched(time) was called: " + time)
+    setTimeout(function(){ 
+        //console.log("reloadSched(time) was executed")
+        location.reload(true)
+    }, time); 
+    //console.log("reloadSched(time) is now at the bottom")
 }
 
 async function getFromTableDynamic(code, scope, table, limit, bound) {
@@ -153,7 +1025,7 @@ async function getFromTableDynamic(code, scope, table, limit, bound) {
         reverse: false,
         show_payer: false
     }
-    console.log("tableReq", tableReq)
+    //console.log("tableReq", tableReq)
     return await wax.rpc.get_table_rows(tableReq);
 }
 
@@ -167,7 +1039,7 @@ async function getFromTable(table, limit) {
         reverse: false,
         show_payer: false
     }
-    console.log("tableReq", tableReq)
+    //console.log("tableReq", tableReq)
     return await wax.rpc.get_table_rows(tableReq);
 }
 
@@ -201,7 +1073,7 @@ async function getFromTableWithoutBound(table, limit) {
     return await wax.rpc.get_table_rows(tableReq);
 }
 
-async function getFromTableWithKey(table, limit) {
+async function getFromTableWithKey(table, limit, keyType, indexPos) {
     var tableReq = {
         json:true,
         code:dappAccount,
@@ -210,544 +1082,12 @@ async function getFromTableWithKey(table, limit) {
         table_key:"",
         lower_bound:userAccount,
         upper_bound:userAccount,
-        index_position:2,
-        key_type:"i64",
+        index_position:indexPos,
+        key_type:keyType,
         limit:limit,
         reverse:false,
         show_payer:false
     }
     // console.log("tableReq", tableReq)
     return await wax.rpc.get_table_rows(tableReq);
-}
-
-var alreadySetupToolsConfs = false
-var alreadySetupExtraHours = false
-var alreadySetupAmuletsConfs = false
-async function startBot() {
-    if (!wax.api) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        await login()
-        return console.log("Not logged")
-    }
-    if (!alreadySetupToolsConfs) {
-        const tools = (await getFromTable('yeti', 100)).rows
-        console.log("tools yeti", tools)
-        await setupToolsConfs(tools)
-        alreadySetupToolsConfs = true
-    }
-    if (!alreadySetupAmuletsConfs) {
-        const amulets = (await getFromTable('amulet', 100)).rows
-        console.log("amulets", amulets)
-        await setupAmuletsConfs(amulets)
-        alreadySetupAmuletsConfs = true
-    }
-    // if (!alreadySetupExtraHours) {
-    //     await getExtraHours()
-    //     alreadySetupExtraHours = true
-    // }
-    // if (start) {
-    //     await repairAllTools()
-    // } else {
-    //     await new Promise(resolve => setTimeout(resolve, 100));
-    //     return console.log("Stop Bot")
-    // }
-    if (autoTransferLand.checked && start) {
-        await transferLand()
-    } else {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        return console.log("Stop Bot")
-    }
-    if (start) {
-        await claimTools()
-    } else {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        return console.log("Stop Bot")
-    }
-    if (start) {
-        await claimAmulets()
-    } else {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        return console.log("Stop Bot")
-    }
-    if (start) {
-        await startBot()
-    } else {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        return console.log("Stop Bot")
-    }
-}
-
-var toolsConfs = []
-async function setupToolsConfs(tools) {
-    const setup = async () => {
-        for (var i = 0; i < tools.length; i++) {
-            const tool = tools[i]
-            const tConfs = (await getFromTableWithBound('yeticfg', 100, '')).rows
-            const tCon = tConfs[tConfs.map(i => i.template_id).indexOf(tool.template_id)]
-            const tConfsExisting = toolsConfs.map(i => i.template_id).indexOf(tool.template_id) > -1 
-            if (!tConfsExisting) {
-                toolsConfs.push(tCon)
-            }
-        }
-    }
-    
-    await setup()
-    console.log("toolsConfs", toolsConfs)
-}
-
-var amuletsConfs = []
-async function setupAmuletsConfs(amulets) {
-    const setup = async () => {
-        for (var i = 0; i < amulets.length; i++) {
-            const amulet = amulets[i]
-            const tConfs = (await getFromTableWithBound('amuletcfg', 100, '')).rows
-            const tCon = tConfs[tConfs.map(i => i.template_id).indexOf(amulet.template_id)]
-            const tConfsExisting = amuletsConfs.map(i => i.template_id).indexOf(amulet.template_id) > -1 
-            if (!tConfsExisting) {
-                amuletsConfs.push(tCon)
-            }
-        }
-    }
-    
-    await setup()
-    console.log("amuletsConfs", amuletsConfs)
-}
-
-// const extraHoursConf = [
-//     {
-//         type: "Asteroid",
-//         hours: 0
-//     },
-//     {
-//         type: "Plasma",
-//         hours: 0
-//     },
-//     {
-//         type: "Oxygen",
-//         hours: 0
-//     }]
-// async function getExtraHours() {
-//     const tools = (await getFromTableWithKey('gadgets', 500)).rows
-//     const setup = () => {
-//         const filteredConfs = toolsConfs.filter(i => i.schema_name == "timemachines")
-//         for (let i = 0; i < filteredConfs.length; i++) {
-//             const timeMachineConf = filteredConfs[i];
-//             const timeMachines = tools.filter(j => j.template_id == timeMachineConf.template_id)
-//             const hours = timeMachineConf.rewards[timeMachineConf.rewards.map(k => k.split(' ')[1]).indexOf('MINING')].split(' ')[0]
-
-//             const index = extraHoursConf.map(j => j.type).indexOf(timeMachineConf.type)
-//             extraHoursConf[index].hours = extraHoursConf[index].hours + (hours * timeMachines.length)
-//         }
-//     } 
-    
-//     setup()
-// }
-
-// async function repairAllTools() {
-//     processIndicatorElem.text("Repairing All Tools")
-//     addLogInfo('Repairing All Tools')
-//     const tools = (await getFromTable('yeti', 100)).rows
-//     // console.log("tools", tools)
-//     const repairableTools = await getRepairableTools(tools)
-//     const qtyTools = repairableTools.length
-
-//     if (qtyTools > 0) {
-//         const batchLength = Math.ceil(qtyTools / maxBatchTools)
-//         for (var i = 0; i < batchLength; i++) {
-//             let currentEntry = i
-//             let currentClose = currentEntry + maxBatchTools > qtyTools ? qtyTools : currentEntry + maxBatchTools
-
-//             const queueTools = repairableTools.slice(currentEntry, currentClose)
-//             await attempRepairTools(queueTools)
-//         }
-//     } else {
-//         await new Promise(resolve => setTimeout(resolve, 5000));
-//     }
-// }
-
-
-// async function getRepairableTools(tools) {
-//     return $.map(tools, (tool) => {
-//         const toolsConf = toolsConfs[toolsConfs.map(i => i.template_id).indexOf(tool.template_id)]
-//         const durability = toolsConf.max_durability
-//         const current_durability = tool.durability_left
-//         return current_durability < durability ? tool : null
-//     })
-// }
-
-async function attempRepairTools(tools) {
-    const actionsRepair = $.map(tools, (tool) => {
-        return {
-            account: dappAccount,
-            name: 'repairyeti',
-            authorization: [{
-                actor: userAccount,
-                permission: 'active',
-            }],
-            data: {
-                account: userAccount,
-                asset_id: tool.asset_id,
-            },
-        }
-    })
-    try {
-        const result = await wax.api.transact({
-            actions: actionsRepair
-        }, {
-            blocksBehind: 3,
-            expireSeconds: 30,
-        });
-        addLog("Success Repair Tool", result, actionsRepair.length, 'list-group-item-success')
-        const user = await getUser()
-        setupTokens(user)
-        await new Promise(resolve => setTimeout(resolve, 5000));
-    } catch (e) {
-        addLog("Error Repair Tool", e, actionsRepair.length, 'list-group-item-danger')
-    }
-}
-
-async function claimTools() {
-    processIndicatorElem.text("Attempt to claim tools")
-    addLogInfo('Attempt to claim tools')
-    const tools = (await getFromTable('yeti', 100)).rows
-    const claimableTools = getClaimableTools(tools)
-    const qtyTools = claimableTools.length
-
-    if (qtyTools > 0) {
-        const claims = async () => {
-            for (var i = 0; i < qtyTools; i++) {
-                const tool = claimableTools[i]
-                await buyEnergy()
-                await attemptClaimAndMineTools([tool], false)
-                await attempRepairTools([tool])
-                // if (!waitingToClaimForLandTransfer) {
-                //     await attemptClaimAndMineTools([tool], true)
-                // }
-            }
-        }
-        await claims()
-    } else {
-        addLogInfo('All tools are not yet ready')
-        await new Promise(resolve => setTimeout(resolve, 5000));
-    }
-}
-
-function getClaimableTools(tools) {
-    return $.map(tools, (tool) => {
-        const dateNow = new Date()
-        const dateClaim = new Date(tool.mine_end * 1000)
-        return dateNow > dateClaim ? tool : null
-    })
-}
-
-async function buyEnergy() {
-    processIndicatorElem.text("Attempt to refill energy")
-    addLogInfo('Attempt to refill energy')
-    const staminas = (await getFromTableWithBound("staminacfg", 10, null)).rows
-    const user = await getUser()
-
-    console.log("staminas", staminas)
-    const energyFull = staminas[staminas.map(i => i.level).indexOf(user.stamina_level)].max_stamina
-    const energyLeft = user.stamina
-    console.log("energyFull", energyFull)
-    console.log("energyLeft", energyLeft)
-
-    const balances = user.balances
-    const sre = tokenIndex(balances, "E") > -1 ? balances[tokenIndex(balances, "E")].split(" ")[0] : 0
-    console.log("sre", sre)
-
-    const costEnergy = parseInt((energyFull - energyLeft))
-    const finalEnergyToRefill = sre > costEnergy ? costEnergy : sre
-
-    if (costEnergy > 0) {
-        const actionsBuyEnergy = [{
-            account: dappAccount,
-            name: 'renewstamina',
-            authorization: [{
-                actor: userAccount,
-                permission: 'active',
-            }],
-            data: {
-                account: userAccount,
-                stamina_to_restore: finalEnergyToRefill,
-            },
-        }]
-        try {
-            const result = await wax.api.transact({
-                actions: actionsBuyEnergy
-            }, {
-                blocksBehind: 3,
-                expireSeconds: 30,
-            });
-            addLog("Success Buy Energy", result, actionsBuyEnergy.length, 'list-group-item-success')
-            const user = await getUser()
-            setupTokens(user)
-            await new Promise(resolve => setTimeout(resolve, 000));
-        } catch (e) {
-            addLog("Error Buy Energy", e, actionsBuyEnergy.length, 'list-group-item-danger')
-        }
-    } else {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-    }
-}
-
-async function attemptClaimAndMineTools(tools, isMine) {
-    const assets = (await getFromTableDynamic('atomicassets', userAccount, 'assets', 9999, null)).rows 
-    const passes = assets.filter(i => i.collection_name == "saarofficial" && i.schema_name == "passes")
-    const passTemplateId = passes.length > 0 ? passes[0].asset_id : 0
-
-    console.log("assets", assets)
-    console.log("passes", passes)
-    console.log("passTemplateId", passTemplateId)
-
-    const actionsClaim = $.map(tools, (tool) => {
-        const actionsData = isMine ? {
-            account: userAccount,
-            asset_id: tool.asset_id,
-            pass_id: passTemplateId
-        } : {
-            account: userAccount,
-            asset_id: tool.asset_id
-        }
-        return {
-            account: dappAccount,
-            name:  isMine ? 'mineyeti' : 'claimyeti',
-            authorization: [{
-                actor: userAccount,
-                permission: 'active',
-            }],
-            data: actionsData,
-        }
-    })
-    try {
-        const result = await wax.api.transact({
-            actions: actionsClaim
-        }, {
-            blocksBehind: 3,
-            expireSeconds: 30,
-        });
-        if (isMine) {
-            addLog("Success Mine Tool", result, actionsClaim.length, 'list-group-item-success')
-        } else {
-            addLog("Success Claim Tool", result, actionsClaim.length, 'list-group-item-success')
-        }
-        const user = await getUser()
-        setupTokens(user)
-        await new Promise(resolve => setTimeout(resolve, 5000));
-    } catch (e) {
-        if (isMine) {
-            addLog("Error Mine Tool", e, actionsClaim.length, 'list-group-item-danger')
-        } else {
-            addLog("Error Claim Tool", e, actionsClaim.length, 'list-group-item-danger')
-        }
-    }
-}
-
-async function claimAmulets() {
-    processIndicatorElem.text("Attempt to claim amulets")
-    addLogInfo('Attempt to claim Tool')
-    const amulets = (await getFromTable('amulet', 100)).rows
-    const claimableAmulets = getClaimableAmulets(amulets)
-    const qtyAmulets = claimableAmulets.length
-
-    if (qtyAmulets > 0) {
-        const claims = async () => {
-            for (var i = 0; i < qtyAmulets; i++) {
-                const amulet = claimableAmulets[i]
-                await attemptClaimAndMineAmulets([amulet], false)
-                await attemptClaimAndMineAmulets([amulet], true)
-            }
-        }
-        await claims()
-    } else {
-        addLogInfo('All amulets are not yet ready')
-        await new Promise(resolve => setTimeout(resolve, 5000));
-    }
-}
-
-function getClaimableAmulets(amulets) {
-    return $.map(amulets, (amulet) => {
-        const dateNow = new Date()
-        const dateClaim = new Date(amulet.mine_end * 1000)
-        return dateNow > dateClaim ? amulet : null
-    })
-}
-
-async function attemptClaimAndMineAmulets(amulets, isMine) {
-    const assets = (await getFromTableDynamic('atomicassets', userAccount, 'assets', 9999, null)).rows 
-    const passes = assets.filter(i => i.collection_name == "saarofficial" && i.schema_name == "passes")
-    const passTemplateId = passes.length > 0 ? passes[0].asset_id : 0
-
-    console.log("assets", assets)
-    console.log("passes", passes)
-    console.log("passTemplateId", passTemplateId)
-
-    const actionsClaim = $.map(amulets, (amulet) => {
-        const actionsData = isMine ? {
-            account: userAccount,
-            asset_id: amulet.asset_id,
-            pass_id: passTemplateId
-        } : {
-            account: userAccount,
-            asset_id: amulet.asset_id
-        }
-        return {
-            account: dappAccount,
-            name:  isMine ? 'mineamlt' : 'claimamlt',
-            authorization: [{
-                actor: userAccount,
-                permission: 'active',
-            }],
-            data: actionsData,
-        }
-    })
-    try {
-        const result = await wax.api.transact({
-            actions: actionsClaim
-        }, {
-            blocksBehind: 3,
-            expireSeconds: 30,
-        });
-        if (isMine) {
-            addLog("Success Mine Amulet", result, actionsClaim.length, 'list-group-item-success')
-        } else {
-            addLog("Success Claim Amulet", result, actionsClaim.length, 'list-group-item-success')
-        }
-        const user = await getUser()
-        setupTokens(user)
-        await new Promise(resolve => setTimeout(resolve, 5000));
-    } catch (e) {
-        if (isMine) {
-            addLog("Error Mine Amulet", e, actionsClaim.length, 'list-group-item-danger')
-        } else {
-            addLog("Error Claim Amulet", e, actionsClaim.length, 'list-group-item-danger')
-        }
-    }
-}
-
-const sunnyWeather = 1
-const highestTax = 5
-async function transferLand() {
-    console.log("waitingToClaimForLandTransfer", waitingToClaimForLandTransfer)
-    const user = await getUser()
-
-    const mineLandId = user.mine_land_id
-    const userResType = user.mine_res_type
-    
-    const currentLand = (await getFromTableWithBound("land", 1, mineLandId)).rows[0]
-    const currentWeather = currentLand.natural_conditions
-    console.log("currentLand", currentLand)
-
-    const changedLandAt = user.mine_land_changed_at
-    var changedLandAtDate = new Date(changedLandAt * 1000)
-    changedLandAtDate.setHours(changedLandAtDate.getHours()+48);
-    const dateNow = new Date()
-
-    console.log("changedLandAtDate", changedLandAtDate)
-    console.log("dateNow", dateNow)
-    if (dateNow < changedLandAtDate) {
-        addLogInfo('You can change your land at ' + changedLandAtDate)
-    } else if (currentWeather == sunnyWeather) {
-        addLogInfo('Your land\'s weather is Sunny, no need to transfer land')
-    } else {
-        const curentLandTemplateId = currentLand.template_id
-        const currentPlayersCount = currentLand.players_count
-        const currentLandTax = currentLand.land_tax
-
-        const landConfs = (await getFromTableWithoutBound("landcfg", 9999)).rows
-        const currentLandConf = landConfs[landConfs.map(i => i.template_id).indexOf(curentLandTemplateId)]
-        const currentRarity = currentLandConf.rarity
-        const currentResType = currentLandConf.res_type
-        const currentMaxPlayersCount = currentLandConf.max_players_count
-
-        const lands = (await getFromTableWithoutBound("land", 99999)).rows
-        const sunnyResTypeLands = lands.filter(i => {
-            const landTemplateId = i.template_id
-            const playersCount = i.players_count
-
-            const landConf = landConfs[landConfs.map(i => i.template_id).indexOf(landTemplateId)]
-            const maxPlayersCount = landConf.max_players_count
-            return i.natural_conditions == sunnyWeather && landConf.res_type == userResType && playersCount < maxPlayersCount && i.land_tax <= highestTax
-        })
-        
-        sunnyResTypeLands.sort((land1, land2) => {
-            const landConf1 = landConfs[landConfs.map(i => i.template_id).indexOf(land1.template_id)]
-            const landConf2 = landConfs[landConfs.map(i => i.template_id).indexOf(land2.template_id)]
-            return land1.land_tax - land2.land_tax && landConf2.rarity - landConf1.rarity
-        })
-
-        const bestLand = sunnyResTypeLands[0]
-
-        console.log("sunnyResTypeLands", sunnyResTypeLands)
-        console.log("bestLand", bestLand)
-        await attemptTransferLand(bestLand.asset_id)
-    }
-}
-
-async function attemptTransferLand(landId) {
-    const actionsClaim = [
-        {
-            account: dappAccount,
-            name: 'selectland',
-            authorization: [{
-                actor: userAccount,
-                permission: 'active',
-            }],
-            data: {
-                account: userAccount,
-                land_id: landId
-            },
-        }
-    ]
-    try {
-        const result = await wax.api.transact({
-            actions: actionsClaim
-        }, {
-            blocksBehind: 3,
-            expireSeconds: 30,
-        });
-        waitingToClaimForLandTransfer = false
-        addLog("Success Transfer Land", result, actionsClaim.length, 'list-group-item-success')
-        const user = await getUser()
-        setupTokens(user)
-        await new Promise(resolve => setTimeout(resolve, 5000));
-    } catch (e) {
-        console.log(e.message)
-        waitingToClaimForLandTransfer = e.message.includes("wait") 
-        addLog("Error Transfer Land", e, actionsClaim.length, 'list-group-item-danger')
-    }
-}
-
-async function getUser() {
-    const users = (await getFromTableWithBound('account', 1, userAccount)).rows
-    console.log("users", users)
-    return users.length > 0 ? users[0] : null
-}
-
-function addLog(tag, textLog, actionsCount, bsClass) {
-    $("#logs").prepend('<li class="transactional-list list-group-item d-flex justify-content-between align-items-center ' + bsClass + '">' + tag + " : " + textLog + '<span class="badge badge-primary badge-pill">' + actionsCount + '</span></li>')
-}
-
-function addLogInfo(textLog) {
-    $("#logs").prepend('<li class="non-transactional-list list-group-item list-group-item-info">' + textLog + '</li>')
-}
-
-reload()
-async function reload() {
-    await new Promise(resolve => setTimeout(resolve, 60000 * 5));
-    location.reload()
-}
-
-attempCathError()
-function attempCathError() {
-  if (enableCatchError) {
-    window.onerror = function myErrorHandler(errorMsg, url, lineNumber) {
-      location.reload();
-      return false;
-    }
-
-    window.addEventListener('unhandledrejection', function (e) {
-      location.reload();
-    })
-  }
 }
